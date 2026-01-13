@@ -4,6 +4,7 @@ import fi.dy.masa.malilib.interfaces.IWorldLoadListener;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.registry.DynamicRegistryManager;
+import ninja.trek.portal.PortalZoneRenderer;
 
 public class PortalWorldLoadListener implements IWorldLoadListener
 {
@@ -28,10 +29,12 @@ public class PortalWorldLoadListener implements IWorldLoadListener
         {
             PortalDataStore.getInstance().clear();
             PortalScanner.getInstance().reset();
+            PortalZoneRenderer.INSTANCE.resetState();
             return;
         }
 
         PortalScanner.getInstance().reset();
+        PortalZoneRenderer.INSTANCE.resetState();
 
         if (worldBefore == null)
         {

@@ -23,9 +23,10 @@ import net.minecraft.world.chunk.WorldChunk;
 public class PortalDataStore
 {
     private static final PortalDataStore INSTANCE = new PortalDataStore();
-    private static final int DATA_VERSION = 1;
+    private static final int DATA_VERSION = 2;
 
     private final List<PortalEntry> portals = new ArrayList<>();
+    private final PortalZoneSettings zoneSettings = new PortalZoneSettings();
     private final List<Runnable> listeners = new ArrayList<>();
     private boolean dirty;
 
@@ -37,6 +38,11 @@ public class PortalDataStore
     public List<PortalEntry> getPortals()
     {
         return Collections.unmodifiableList(this.portals);
+    }
+
+    public PortalZoneSettings getZoneSettings()
+    {
+        return this.zoneSettings;
     }
 
     public void addListener(Runnable listener)
@@ -55,6 +61,7 @@ public class PortalDataStore
     public void clear()
     {
         this.portals.clear();
+        this.zoneSettings.reset();
         this.dirty = false;
         this.notifyListeners();
     }
@@ -71,6 +78,11 @@ public class PortalDataStore
         {
             JsonObject root = element.getAsJsonObject();
             JsonArray arr = root.has("portals") ? root.getAsJsonArray("portals") : new JsonArray();
+
+            if (root.has("zone_settings") && root.get("zone_settings").isJsonObject())
+            {
+                this.zoneSettings.fromJson(root.getAsJsonObject("zone_settings"));
+            }
 
             for (JsonElement entryEl : arr)
             {
@@ -106,6 +118,7 @@ public class PortalDataStore
         }
 
         root.add("version", new JsonPrimitive(DATA_VERSION));
+        root.add("zone_settings", this.zoneSettings.toJson());
         root.add("portals", arr);
 
         JsonUtils.writeJsonToFileAsPath(root, file);

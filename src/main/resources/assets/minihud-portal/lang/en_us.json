@@ -1,4 +1,5 @@
 {
   "minihud-portal.gui.title.portals": "Portals",
-  "minihud-portal.gui.button.config_gui.portals": "Portals"
+  "minihud-portal.gui.button.config_gui.portals": "Portals",
+  "minihud-portal.gui.button.portal_zone_borders": "Show Portal Zone Borders: %s"
 }
