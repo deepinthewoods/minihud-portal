@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "ninja.trek.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"MixinClientPlayNetworkHandler",
+		"MixinGuiConfigs"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
