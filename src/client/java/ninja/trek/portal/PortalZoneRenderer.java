@@ -205,7 +205,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         if (settings.shouldRenderLines() != this.lastRenderLines)
         {
             this.renderDirty = true;
-            this.markAllPortalsDirty(false, true);
+            this.markAllPortalsDirty(true, true);
         }
 
         if (settings.shouldRenderThrough() != this.lastRenderThrough)
@@ -789,7 +789,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         double maxRange = mc.options.getViewDistance().getValue() * 16.0D;
         double maxRangeSq = maxRange * maxRange;
 
-        profiler.push("portal_zone_quads");
+        profiler.push(renderLines ? "portal_zone_lines" : "portal_zone_quads");
         for (Int2ObjectOpenHashMap.Entry<PortalRenderCache> entry : this.portalRenderCaches.int2ObjectEntrySet())
         {
             PortalRenderCache cache = entry.getValue();
@@ -799,11 +799,13 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 continue;
             }
 
-            this.buildPortalQuads(cache, cameraPos);
-
             if (renderLines)
             {
                 this.buildPortalOutlines(cache, cameraPos);
+            }
+            else
+            {
+                this.buildPortalQuads(cache, cameraPos);
             }
         }
         profiler.pop();
@@ -827,7 +829,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         BufferBuilder builder = cache.quads.start(
                 () -> "minihud-portal:portal_zones/quads/" + cache.portalIndex,
                 this.renderThrough ? MaLiLibPipelines.MINIHUD_SHAPE_NO_DEPTH_OFFSET : MaLiLibPipelines.MINIHUD_SHAPE_OFFSET_NO_CULL);
-        Color4f color = Color4f.fromColor(cache.color, 1.0f);
+        Color4f color = Color4f.fromColor(cache.color, 0.3f);
         RenderUtils.renderBlockPositions(positions, this.layerRange, color, 0.0D, cameraPos, builder);
 
         try
@@ -919,11 +921,13 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 continue;
             }
 
-            this.drawRenderObject(cache.quads, cameraPos);
-
             if (renderLines)
             {
                 this.drawRenderObject(cache.outlines, cameraPos);
+            }
+            else
+            {
+                this.drawRenderObject(cache.quads, cameraPos);
             }
         }
     }
@@ -989,12 +993,14 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 continue;
             }
 
-            if (cache.quadsDirty || cache.quads.isUploadedPublic() == false)
+            if (renderLines)
             {
-                return true;
+                if (cache.outlinesDirty || cache.outlines.isUploadedPublic() == false)
+                {
+                    return true;
+                }
             }
-
-            if (renderLines && (cache.outlinesDirty || cache.outlines.isUploadedPublic() == false))
+            else if (cache.quadsDirty || cache.quads.isUploadedPublic() == false)
             {
                 return true;
             }
