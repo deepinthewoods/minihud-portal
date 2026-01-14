@@ -1,0 +1,63 @@
+Coordinate conversion
+Horizontal coordinates and distances in the Nether are proportional to the Overworld in a 1:8 ratio. That is, by moving 1 block horizontally in the Nether, players have moved the equivalent of 8 blocks on the Overworld. This does not apply to the Y-axis. Thus, for a given location (X, Y, Z) in the Overworld, the corresponding coordinates in the Nether are (floor(X ÷ 8), Y, floor(Z ÷ 8)), and conversely, for a location (X, Y, Z) in the Nether, the matching Overworld coordinates are (X × 8, Y, Z × 8).
+
+The Java floor() method used in these conversions rounds down to the largest integer less than or equal to the argument (toward smaller positive values and toward larger negative values), so a coordinate of 29.9 rounds to 29, and one of −29.9 to −30.
+
+Both the X and Z coordinates in this conversion are constrained to be within the world border (29,999,983 and -29,999,984 (inclusive)); this affects travel to the Overworld from the Nether at X or Z beyond ±3,749,998.
+
+Portal search
+When an entity starts colliding with a Nether portal block, the game records the coordinates of the entity.
+
+The game then converts those coordinates into destination coordinates as above: The entry X- and Z-coordinates are multiplied by 8 if the entity is in the Nether or divided by 8 if the entity is in the Overworld, while the Y-coordinate is not changed.
+
+Starting at these destination coordinates, the game looks for all nearby portal points of interest. The point of interest can be within a 256×256 block area (128-block radius) in the Overworld and a 32×32 block area (16-block radius) in the Nether[2] centered on the converted coordinate and the full map height.
+
+If any candidate portal point of interest is found, then the game selects the closest one as determined by its distance in the new coordinate system (including the Y coordinate, which can cause seemingly more distant portals to be selected), and teleports the entity to the location in the new portal calculated by a special algorithm. Note that the calculated distance is Euclidean distance, not taxicab distance. The distance computation between portals in the range is a straight-line distance calculation, and the shortest path is chosen, counting the Y difference.
+
+The algorithm used for determining the position of the entity inside the destination portal to teleport to is as follows:
+
+Portal rectangle dimensions are determined for both source and destination portals. (Not counting the obsidian)
+Entity hitbox dimensions are subtracted from those rectangles' width and height, meaning that the entity can now be considered as a point, to avoid problems with preserving the hitbox dimensions in a geometrical transformation.
+Distance between the bottom of the source portal and the bottom of the entity hitbox is measured, similar is done for distance to one of the sides of the portal.
+Those offsets are then multiplied by the ratio of the reduced sizes of the portals and used to get the position in the destination portal.
+If one of the dimensions of entity hitbox is larger than the portal, the corresponing dimension falls back to bottom-middle of the destination portal, the other dimension is still calculated using the algorithm.
+If the destination portal is at 90° to the source portal, entity yaw and velocity are rotated 90° clockwise, regardless of the direction of travel, meaning that if player travels there and back without touching their mouse, they get rotated 180°, but the coordinates remain the same, making it appear as if the player exited through the wrong side of the portal ‌[Java Edition only].
+This way, if source and destination portals are of the same shape, have the same orientation, and no other portals are interfering with the linking, one can safely assume that entities can travel through them as if the portal frames were physically placed behind each other.
+
+How portals work
+Portals try to link up at their equivalent location calculated by Overworld (X,Y,Z) <=> Nether (X/8, Y, Z/8).
+
+First the game calculates the "ideal" destination coordinate as above, dividing or multiplying the traveler's X and Z coordinates by 8. It then searches for existing portals (actual portal blocks) within nearby chunks.
+If going to the Nether it searches a 33×33 block area (centered on the "ideal" coordinates).
+If going to the Overworld, it searches a much larger area, 17×17 chunks (that is, up to 8 chunks away from the original point).
+In either dimension, the entire vertical range of the world is scanned.
+For any column of portal blocks (such as the two 3-high columns of a "standard" portal), only the bottom one is considered.
+If any portals are found in this range, the traveler is teleported to the closest of them, based on the Euclidean (not taxicab) distance in all three coordinates. Differences in the Y coordinate can bypass the portal that's closest in only X and Z!
+If no portals are found within range, the game sets out to make a portal:
+It searches within 16 blocks horizontally (but any distance vertically) of the player's destination coordinates.
+For the first pass, a valid location is 3×4 buildable blocks with air 4 high above all 12 blocks. When enough space is available, the orientation of the portal is random. The closest valid position in the 3D distance is always picked.
+If no such space is found, it tries again looking for a narrower fit: A 1x4 area of buildable blocks, still with air 4 high above them.
+If both of the above fail, the game forces a portal:
+The ideal X and Z coordinates are used, but Y is clipped to be between 70, and 10 below the world height (i.e. 118 for the Nether or 246 for the Overworld).
+A 2×3 platform of obsidian with air 3 high above is created at the target location, overwriting whatever might be there. This provides air space underground, or a small platform if high in the air. In Bedrock Edition, the platform includes 4 more blocks of netherrack on each side, a total of 12 blocks of platform.
+When creating a portal, the game always makes a 4×5 frame of obsidian, including corner blocks.
+Pairing portals
+To set up pairs of Nether portals properly so that they reliably travel to each other, it is best to build both portals manually. Build at desired location X,Y,Z in the Overworld. Then travel to the Nether. And then dig your way to X/8, Y, Z/8, and build a portal there.
+
+As block coordinates are centered on the lower northwest corner of blocks, higher precision can be achieved by placing a portal in the nether where block coordinates are the least precise relative to the Overworld, recording the block coordinates, and adding 0.5 to each value before multiplying it by 8 to find the ideal Overworld coordinates. This can allow portals as close as 8 blocks to behave reliably in the Overworld, and can make adjacent portal blocks in the nether reliably teleport to different overworld portals as well. Even greater precision can be achieved when considering that teleportation from the Nether to the Overworld uses the player's coordinates without rounding -- thereby making it possible to have reliable, if difficult to use, portals as close as 1 block. Precisely linked portals can also be stacked vertically without interfering with one another.
+
+A less precise method would be to temporarily deactivate all portals within a 128 block "radius" from within the Nether. Through death or with the aid of a second player, entering a new portal from the Overworld forces the creation of a new portal within the Nether which the overworld portal should prefer. This is not recommended as it limits how close overworld portals can be placed due to the zone of exclusions and can lead to unpredictable placement of the resulting portal.
+
+The Y coordinate is not divided for pairings, however it does play a factor in mapping the portals. Therefore, two overworld portals could be built at the same x,z coordinates with one at a very low Y, e.g., 5, and one at a higher y, e.g. 160. A Nether portal at these X and Z coordinates links to whichever portal is closest on the Y axis.
+
+If this all sounds complicated to you, this website can help you in the process: https://gamertools.net/applications/nether.
+
+Zones of exclusion
+The nether portal spawning algorithm can only spawn a portal within a 33×33 block column centered on the destination, but it does scan that width (and the height of the world) for open space to place the portal. This often causes it to spawn a portal at a location significantly different than the corresponding location in the other world. The larger the distance between a portal and its "ideal" destination, the larger the zone of exclusion. This zone is the area in each world where you cannot build another portal without breaking the link between the first two portals. One way to think of this zone is as spheres around each portal, each of a true radius equal to its distance to the equivalent location of the other. For example, if the overworld portal was at (0,50,0) and the Nether portal at (0,100,0), then the portals are 50 meters away from each other. In this (simple) case, if a nether portal was built closer than 50 meters to (0,50,0), then the Overworld portal links to it.
+
+Because of the coordinate change, portals created in the Nether are much more likely to have ideal coordinates that are horizontally distant from the overworld portal that created them. When going the other way, horizontal coordinates tend to be closer to ideal (because whatever space is found has a Nether-equivalent location closer to the original portal), but vertical displacement can still be an issue.
+
+If you wish to ensure that two portals link together, manually build portals as close as possible in all 3 coordinate axes. It doesn't have to be exact, or even all that close, if the player ensures that no other portals is constructed in the exclusion zone created by the difference.
+
+2-in-1 Nether portals
+It is possible to end up in a situation where a nether portal "randomly" places the player in 1 of 2 possible overworld destination portals. This is simply because the nether portal has two effective coordinates as it is 2 blocks wide, say (X, Y, Z) on the left, and (X+1, Y, Z) on the right. If the player entered on the left side, (X, Y, Z) translates to (X*8, Y, Z*8) in the overworld and the game picks the portal closest to that. If the player entered on the right side, (X+1, Y, Z) translates to (X*8+8, Y, Z*8) and the game picks a portal closest to that point instead. This situation occurs when the nether portal's location is roughly equidistant between the 2 overworld portals (within 8 blocks overworld distance difference). However, building 2 nether portals side by side is probably better for destination clarity than building a 2-in-1 portal. It is possible to span distances with pairs of portals in this way, though normally faster to simply walk through the Nether.[1]

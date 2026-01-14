@@ -540,7 +540,6 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
         int bestIndex = -1;
         double bestDist = Double.POSITIVE_INFINITY;
-        int bestY = Integer.MAX_VALUE;
 
         for (int portalIndex : portalIndices)
         {
@@ -553,17 +552,16 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
             PortalBounds bounds = portal.bounds();
             int closestX = MathHelper.clamp(destX, bounds.getMinX(), bounds.getMaxX());
-            int closestY = MathHelper.clamp(destY, bounds.getMinY(), bounds.getMaxY());
             int closestZ = MathHelper.clamp(destZ, bounds.getMinZ(), bounds.getMaxZ());
+            int closestY = bounds.getMinY();
             double dx = closestX - destX;
             double dy = closestY - destY;
             double dz = closestZ - destZ;
             double distSq = dx * dx + dy * dy + dz * dz;
 
-            if (distSq < bestDist || (distSq == bestDist && closestY < bestY))
+            if (distSq < bestDist)
             {
                 bestDist = distSq;
-                bestY = closestY;
                 bestIndex = portalIndex;
             }
         }
