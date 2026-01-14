@@ -10,6 +10,8 @@ import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.minihud.gui.GuiConfigs;
 import fi.dy.masa.minihud.gui.GuiConfigs.ConfigGuiTab;
 import fi.dy.masa.minihud.gui.GuiShapeManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import ninja.trek.gui.widgets.WidgetListPortals;
 import ninja.trek.gui.widgets.WidgetPortalEntry;
 import ninja.trek.portal.PortalDataStore;
@@ -19,6 +21,7 @@ import ninja.trek.portal.PortalZoneRenderer;
 
 public class GuiPortals extends GuiListBase<PortalEntry, WidgetPortalEntry, WidgetListPortals>
 {
+    private static final Logger LOGGER = LogManager.getLogger("minihud-portal");
     private final Runnable dataListener;
 
     public GuiPortals()
@@ -130,6 +133,7 @@ public class GuiPortals extends GuiListBase<PortalEntry, WidgetPortalEntry, Widg
             zoneBordersButton.updateDisplayString(settings.isShowZoneBorders());
             PortalDataStore.getInstance().markDirty();
             PortalZoneRenderer.INSTANCE.onSettingsChanged();
+            LOGGER.warn("Portal zone borders toggled via GUI: showZoneBorders={}", settings.isShowZoneBorders());
         });
 
         this.addButton(renderLinesButton, (btn, mouseBtn) -> {
@@ -137,6 +141,7 @@ public class GuiPortals extends GuiListBase<PortalEntry, WidgetPortalEntry, Widg
             renderLinesButton.updateDisplayString(settings.shouldRenderLines());
             PortalDataStore.getInstance().markDirty();
             PortalZoneRenderer.INSTANCE.onSettingsChanged();
+            LOGGER.warn("Portal zone borders render lines toggled via GUI: renderLines={}", settings.shouldRenderLines());
         });
 
         this.addButton(renderThroughButton, (btn, mouseBtn) -> {
@@ -144,6 +149,7 @@ public class GuiPortals extends GuiListBase<PortalEntry, WidgetPortalEntry, Widg
             renderThroughButton.updateDisplayString(settings.shouldRenderThrough());
             PortalDataStore.getInstance().markDirty();
             PortalZoneRenderer.INSTANCE.onSettingsChanged();
+            LOGGER.warn("Portal zone borders render through toggled via GUI: renderThrough={}", settings.shouldRenderThrough());
         });
 
         if (rows > 1)
