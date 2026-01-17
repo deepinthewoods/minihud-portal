@@ -12,7 +12,7 @@ import net.minecraft.client.input.KeyInput;
 import ninja.trek.portal.PortalDataStore;
 import ninja.trek.portal.PortalEntry;
 
-public class WidgetPortalEntry extends WidgetListEntryBase<PortalEntry>
+public class WidgetPortalEntry extends WidgetListEntryBase<Object>
 {
     private static final int COLOR_SIZE = 16;
     private static final int FIELD_HEIGHT = 16;
@@ -24,7 +24,7 @@ public class WidgetPortalEntry extends WidgetListEntryBase<PortalEntry>
     private final int aliasFieldWidth;
 
     public WidgetPortalEntry(int x, int y, int width, int height, boolean isOdd,
-            PortalEntry portal, int listIndex, WidgetListPortals parent)
+            PortalEntry portal, int listIndex, @SuppressWarnings("unused") Object parent)
     {
         super(x, y, width, height, portal, listIndex);
 

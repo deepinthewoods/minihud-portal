@@ -6,6 +6,7 @@ import fi.dy.masa.malilib.gui.button.ButtonBase;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.button.ButtonOnOff;
 import fi.dy.masa.malilib.gui.button.IButtonActionListener;
+import fi.dy.masa.malilib.gui.widgets.WidgetListEntryBase;
 import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.minihud.gui.GuiConfigs;
 import fi.dy.masa.minihud.gui.GuiConfigs.ConfigGuiTab;
@@ -19,7 +20,7 @@ import ninja.trek.portal.PortalEntry;
 import ninja.trek.portal.PortalZoneSettings;
 import ninja.trek.portal.PortalZoneRenderer;
 
-public class GuiPortals extends GuiListBase<PortalEntry, WidgetPortalEntry, WidgetListPortals>
+public class GuiPortals extends GuiListBase<Object, WidgetListEntryBase<Object>, WidgetListPortals>
 {
     private static final Logger LOGGER = LogManager.getLogger("minihud-portal");
     private final Runnable dataListener;
