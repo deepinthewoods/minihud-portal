@@ -551,18 +551,24 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             }
 
             PortalBounds bounds = portal.bounds();
-            int closestX = MathHelper.clamp(destX, bounds.getMinX(), bounds.getMaxX());
-            int closestZ = MathHelper.clamp(destZ, bounds.getMinZ(), bounds.getMaxZ());
-            int closestY = bounds.getMinY();
-            double dx = closestX - destX;
-            double dy = closestY - destY;
-            double dz = closestZ - destZ;
-            double distSq = dx * dx + dy * dy + dz * dz;
+            int portalMinY = bounds.getMinY();
 
-            if (distSq < bestDist)
+            // Check every portal block in the XZ plane (only bottom of each column matters per algorithm.txt)
+            for (int portalX = bounds.getMinX(); portalX <= bounds.getMaxX(); ++portalX)
             {
-                bestDist = distSq;
-                bestIndex = portalIndex;
+                for (int portalZ = bounds.getMinZ(); portalZ <= bounds.getMaxZ(); ++portalZ)
+                {
+                    double dx = portalX - destX;
+                    double dy = portalMinY - destY;
+                    double dz = portalZ - destZ;
+                    double distSq = dx * dx + dy * dy + dz * dz;
+
+                    if (distSq < bestDist)
+                    {
+                        bestDist = distSq;
+                        bestIndex = portalIndex;
+                    }
+                }
             }
         }
 
@@ -690,7 +696,9 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
     private int toSourceMax(double dest, double scale)
     {
-        return (int) Math.floor(dest / scale - 0.5D);
+        double upper = (dest + 1.0D) / scale - 0.5D;
+        upper = Math.nextAfter(upper, Double.NEGATIVE_INFINITY);
+        return (int) Math.floor(upper);
     }
 
     private void renderPortals(Vec3d cameraPos, MinecraftClient mc, Profiler profiler, boolean renderLines)
