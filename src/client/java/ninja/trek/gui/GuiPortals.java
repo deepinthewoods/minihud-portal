@@ -125,6 +125,10 @@ public class GuiPortals extends GuiListBase<Object, WidgetListEntryBase<Object>,
         ButtonOnOff renderThroughButton = new ButtonOnOff(0, 0, -1, false,
                 "minihud.gui.button.shape_renderer.toggle_render_through", settings.shouldRenderThrough());
         layout = this.placeTopRowButton(layout, renderThroughButton);
+
+        ButtonOnOff renderLettersButton = new ButtonOnOff(0, 0, -1, false,
+                "minihud-portal.gui.button.portal_zone_letters", settings.shouldRenderLetters());
+        layout = this.placeTopRowButton(layout, renderLettersButton);
         x = layout.x();
         y = layout.y();
         rows = layout.rows();
@@ -151,6 +155,14 @@ public class GuiPortals extends GuiListBase<Object, WidgetListEntryBase<Object>,
             PortalDataStore.getInstance().markDirty();
             PortalZoneRenderer.INSTANCE.onSettingsChanged();
             LOGGER.warn("Portal zone borders render through toggled via GUI: renderThrough={}", settings.shouldRenderThrough());
+        });
+
+        this.addButton(renderLettersButton, (btn, mouseBtn) -> {
+            settings.toggleRenderLetters();
+            renderLettersButton.updateDisplayString(settings.shouldRenderLetters());
+            PortalDataStore.getInstance().markDirty();
+            PortalZoneRenderer.INSTANCE.onSettingsChanged();
+            LOGGER.warn("Portal zone letters toggled via GUI: renderLetters={}", settings.shouldRenderLetters());
         });
 
         if (rows > 1)

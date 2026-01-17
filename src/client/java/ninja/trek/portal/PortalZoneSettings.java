@@ -8,6 +8,7 @@ public class PortalZoneSettings
     private boolean showZoneBorders;
     private boolean renderLines;
     private boolean renderThrough;
+    private boolean renderLetters;
 
     public boolean isShowZoneBorders()
     {
@@ -22,6 +23,11 @@ public class PortalZoneSettings
     public boolean shouldRenderThrough()
     {
         return this.renderThrough;
+    }
+
+    public boolean shouldRenderLetters()
+    {
+        return this.renderLetters;
     }
 
     public void setShowZoneBorders(boolean showZoneBorders)
@@ -39,6 +45,11 @@ public class PortalZoneSettings
         this.renderThrough = renderThrough;
     }
 
+    public void setRenderLetters(boolean renderLetters)
+    {
+        this.renderLetters = renderLetters;
+    }
+
     public void toggleShowZoneBorders()
     {
         this.showZoneBorders = !this.showZoneBorders;
@@ -54,11 +65,17 @@ public class PortalZoneSettings
         this.renderThrough = !this.renderThrough;
     }
 
+    public void toggleRenderLetters()
+    {
+        this.renderLetters = !this.renderLetters;
+    }
+
     public void reset()
     {
         this.showZoneBorders = false;
         this.renderLines = false;
         this.renderThrough = false;
+        this.renderLetters = false;
     }
 
     public JsonObject toJson()
@@ -67,6 +84,7 @@ public class PortalZoneSettings
         obj.addProperty("show_zone_borders", this.showZoneBorders);
         obj.addProperty("render_lines", this.renderLines);
         obj.addProperty("render_through", this.renderThrough);
+        obj.addProperty("render_letters", this.renderLetters);
         return obj;
     }
 
@@ -80,5 +98,6 @@ public class PortalZoneSettings
         this.showZoneBorders = JsonUtils.getBooleanOrDefault(obj, "show_zone_borders", this.showZoneBorders);
         this.renderLines = JsonUtils.getBooleanOrDefault(obj, "render_lines", this.renderLines);
         this.renderThrough = JsonUtils.getBooleanOrDefault(obj, "render_through", this.renderThrough);
+        this.renderLetters = JsonUtils.getBooleanOrDefault(obj, "render_letters", this.renderLetters);
     }
 }
