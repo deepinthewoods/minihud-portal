@@ -920,31 +920,34 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL);  // No depth test - renders through walls
 
         // Calculate portal center (portal bounds are in portal dimension coordinates)
-        double centerX = (bounds.getMinX() + bounds.getMaxX()) / 2.0;
-        double centerY = (bounds.getMinY() + bounds.getMaxY()) / 2.0;
-        double centerZ = (bounds.getMinZ() + bounds.getMaxZ()) / 2.0;
+        double centerX = (bounds.getMinX() + bounds.getMaxX() + 1.0) / 2.0;
+        double centerY = (bounds.getMinY() + bounds.getMaxY() + 1.0) / 2.0;
+        double centerZ = (bounds.getMinZ() + bounds.getMaxZ() + 1.0) / 2.0;
 
         // Translate to source dimension position (inverse of the scale)
         double translatedCenterX = centerX / scale;
         double translatedCenterZ = centerZ / scale;
 
-        // Calculate letter size based on portal's actual size (not scaled)
-        double portalWidth = bounds.getMaxX() - bounds.getMinX() + 1.0;
+        // Calculate letter size based on portal's actual size (scaled to source X/Z)
+        double portalWidthX = bounds.getMaxX() - bounds.getMinX() + 1.0;
+        double portalWidthZ = bounds.getMaxZ() - bounds.getMinZ() + 1.0;
+        double portalWidth = Math.max(portalWidthX, portalWidthZ);
         double portalHeight = bounds.getMaxY() - bounds.getMinY() + 1.0;
-        double letterSize = Math.max(portalWidth, portalHeight);
+        double letterWidth = portalWidth / Math.abs(scale);
+        double letterHeight = portalHeight;
 
         // Determine letter based on portal's own dimension
         boolean isNether = portalDimensionId.equals(World.NETHER.getValue().toString());
 
         char letterChar = isNether ? 'N' : 'O';
-        LOGGER.info("Building letter '{}' for portal {} at ({}, {}, {}), size={}, portalDim={}",
+        LOGGER.info("Building letter '{}' for portal {} at ({}, {}, {}), size={}x{}, portalDim={}",
                    letterChar, cacheKey, translatedCenterX, centerY, translatedCenterZ,
-                   letterSize, portalDimensionId);
+                   letterWidth, letterHeight, portalDimensionId);
 
         Color4f letterColor = Color4f.fromColor(color, 1.0f);
         Vec3d viewDir = this.getCameraViewDirection();
         this.drawBillboardedLetter(builder, translatedCenterX, centerY, translatedCenterZ,
-                                   letterSize, letterChar, letterColor, cameraPos, viewDir);
+                                   letterWidth, letterHeight, letterChar, letterColor, cameraPos, viewDir);
 
         try
         {
@@ -968,13 +971,15 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     }
 
     private void drawBillboardedLetter(BufferBuilder builder, double worldX, double worldY, double worldZ,
-                                       double size, char letter, Color4f color, Vec3d cameraPos, Vec3d viewDir)
+                                       double width, double height, char letter, Color4f color,
+                                       Vec3d cameraPos, Vec3d viewDir)
     {
         // Camera-relative position
         float cx = (float) (worldX - cameraPos.x);
         float cy = (float) (worldY - cameraPos.y);
         float cz = (float) (worldZ - cameraPos.z);
-        float halfSize = (float) (size / 2.0);
+        float halfWidth = (float) (width / 2.0);
+        float halfHeight = (float) (height / 2.0);
 
         // For proper billboarding, we need to construct a coordinate system
         // where the letter faces the camera.
@@ -1027,16 +1032,16 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         {
             // Draw N letter using billboarded coordinate system
             // Left vertical line position
-            float leftX = cx - rightX * halfSize;
-            float leftZ = cz - rightZ * halfSize;
+            float leftX = cx - rightX * halfWidth;
+            float leftZ = cz - rightZ * halfWidth;
 
             // Right vertical line position
-            float rightVertX = cx + rightX * halfSize;
-            float rightVertZ = cz + rightZ * halfSize;
+            float rightVertX = cx + rightX * halfWidth;
+            float rightVertZ = cz + rightZ * halfWidth;
 
             // Bottom and top positions along up vector
-            float bottomY = cy - upY * halfSize;
-            float topY = cy + upY * halfSize;
+            float bottomY = cy - upY * halfHeight;
+            float topY = cy + upY * halfHeight;
 
             // Draw multiple parallel lines for thickness
             int thickness = 8;
@@ -1081,13 +1086,13 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                     float oy = rightY * offset;
                     float oz = rightZ * offset;
 
-                    float x1 = cx + (cos1 * rightX + sin1 * upX) * halfSize;
-                    float y1 = cy + (cos1 * rightY + sin1 * upY) * halfSize;
-                    float z1 = cz + (cos1 * rightZ + sin1 * upZ) * halfSize;
+                    float x1 = cx + (cos1 * rightX * halfWidth) + (sin1 * upX * halfHeight);
+                    float y1 = cy + (cos1 * rightY * halfWidth) + (sin1 * upY * halfHeight);
+                    float z1 = cz + (cos1 * rightZ * halfWidth) + (sin1 * upZ * halfHeight);
 
-                    float x2 = cx + (cos2 * rightX + sin2 * upX) * halfSize;
-                    float y2 = cy + (cos2 * rightY + sin2 * upY) * halfSize;
-                    float z2 = cz + (cos2 * rightZ + sin2 * upZ) * halfSize;
+                    float x2 = cx + (cos2 * rightX * halfWidth) + (sin2 * upX * halfHeight);
+                    float y2 = cy + (cos2 * rightY * halfWidth) + (sin2 * upY * halfHeight);
+                    float z2 = cz + (cos2 * rightZ * halfWidth) + (sin2 * upZ * halfHeight);
 
                     builder.vertex(x1 + ox, y1 + oy, z1 + oz).color(color.r, color.g, color.b, color.a);
                     builder.vertex(x2 + ox, y2 + oy, z2 + oz).color(color.r, color.g, color.b, color.a);
