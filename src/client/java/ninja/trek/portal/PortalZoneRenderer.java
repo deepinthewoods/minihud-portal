@@ -70,16 +70,18 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     {
         PortalZoneSettings settings = PortalDataStore.getInstance().getZoneSettings();
         boolean showZoneBorders = settings.isShowZoneBorders();
+        boolean renderLetters = settings.shouldRenderLetters();
         boolean hasWorld = mc.world != null;
         TargetDimension target = hasWorld ? this.resolveTarget(mc.world) : null;
-        boolean shouldRender = showZoneBorders && hasWorld && target != null;
+        boolean shouldRender = (showZoneBorders || renderLetters) && hasWorld && target != null;
 
         if (this.pendingToggleDiagnostics)
         {
             LOGGER.info(
-                    "Portal zone borders diagnostics: shouldRender={} showZoneBorders={} hasWorld={} targetDimension={}",
+                    "Portal zone borders diagnostics: shouldRender={} showZoneBorders={} renderLetters={} hasWorld={} targetDimension={}",
                     shouldRender,
                     showZoneBorders,
+                    renderLetters,
                     hasWorld,
                     target != null ? target.dimensionId : "<none>");
         }
@@ -119,6 +121,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     {
         PortalZoneSettings settings = PortalDataStore.getInstance().getZoneSettings();
         boolean showZoneBorders = settings.isShowZoneBorders();
+        boolean renderLetters = settings.shouldRenderLetters();
 
         if (showZoneBorders != this.lastShowZoneBorders)
         {
@@ -138,7 +141,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             }
         }
 
-        if (showZoneBorders == false || mc.world == null || entity == null)
+        if (showZoneBorders == false && renderLetters == false || mc.world == null || entity == null)
         {
             if (this.pendingToggleDiagnostics)
             {
@@ -236,7 +239,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             this.loggedNoDataSinceToggle = true;
         }
 
-        if (this.hasData())
+        if (this.hasData() || (renderLetters && this.searchContext != null && this.searchContext.portals.isEmpty() == false))
         {
             this.renderThrough = settings.shouldRenderThrough();
             this.renderPortals(cameraPos, mc, profiler, settings.shouldRenderLines());
@@ -718,7 +721,9 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             return;
         }
 
-        boolean renderLetters = PortalDataStore.getInstance().getZoneSettings().shouldRenderLetters();
+        PortalZoneSettings settings = PortalDataStore.getInstance().getZoneSettings();
+        boolean showZoneBorders = settings.isShowZoneBorders();
+        boolean renderLetters = settings.shouldRenderLetters();
 
         double maxRange = mc.options.getViewDistance().getValue() * 16.0D * 2.0D;
         double maxRangeSq = maxRange * maxRange;
@@ -733,13 +738,16 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 continue;
             }
 
-            if (renderLines)
+            if (showZoneBorders)
             {
-                this.buildPortalOutlines(cache, cameraPos);
-            }
-            else
-            {
-                this.buildPortalQuads(cache, cameraPos);
+                if (renderLines)
+                {
+                    this.buildPortalOutlines(cache, cameraPos);
+                }
+                else
+                {
+                    this.buildPortalQuads(cache, cameraPos);
+                }
             }
 
             // Build letters for this portal if enabled
@@ -772,7 +780,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
         BufferBuilder builder = cache.quads.start(
                 () -> "minihud-portal:portal_zones/quads/" + cache.portalIndex,
-                this.renderThrough ? MaLiLibPipelines.MINIHUD_SHAPE_NO_DEPTH_OFFSET : MaLiLibPipelines.MINIHUD_SHAPE_OFFSET_NO_CULL);
+                this.renderThrough ? MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL : MaLiLibPipelines.POSITION_COLOR_MASA_LEQUAL_DEPTH_OFFSET_1);
         Color4f color = Color4f.fromColor(cache.color, 0.3f);
         RenderUtils.renderBlockPositions(positions, this.layerRange, color, 0.0D, cameraPos, builder);
 
@@ -968,21 +976,32 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             float bottomY = cy - upY * halfSize;
             float topY = cy + upY * halfSize;
 
-            // Left vertical line
-            builder.vertex(leftX, bottomY, leftZ).color(color.r, color.g, color.b, color.a);
-            builder.vertex(leftX, topY, leftZ).color(color.r, color.g, color.b, color.a);
+            // Draw multiple parallel lines for thickness
+            int thickness = 8;
+            for (int t = 0; t < thickness; t++)
+            {
+                float offset = (t / (float) (thickness - 1) - 0.5f) * 0.15f;
+                float ox = rightX * offset;
+                float oy = rightY * offset;
+                float oz = rightZ * offset;
 
-            // Right vertical line
-            builder.vertex(rightVertX, bottomY, rightVertZ).color(color.r, color.g, color.b, color.a);
-            builder.vertex(rightVertX, topY, rightVertZ).color(color.r, color.g, color.b, color.a);
+                // Left vertical line
+                builder.vertex(leftX + ox, bottomY + oy, leftZ + oz).color(color.r, color.g, color.b, color.a);
+                builder.vertex(leftX + ox, topY + oy, leftZ + oz).color(color.r, color.g, color.b, color.a);
 
-            // Diagonal line (from top-left to bottom-right)
-            builder.vertex(leftX, topY, leftZ).color(color.r, color.g, color.b, color.a);
-            builder.vertex(rightVertX, bottomY, rightVertZ).color(color.r, color.g, color.b, color.a);
+                // Right vertical line
+                builder.vertex(rightVertX + ox, bottomY + oy, rightVertZ + oz).color(color.r, color.g, color.b, color.a);
+                builder.vertex(rightVertX + ox, topY + oy, rightVertZ + oz).color(color.r, color.g, color.b, color.a);
+
+                // Diagonal line
+                builder.vertex(leftX + ox, topY + oy, leftZ + oz).color(color.r, color.g, color.b, color.a);
+                builder.vertex(rightVertX + ox, bottomY + oy, rightVertZ + oz).color(color.r, color.g, color.b, color.a);
+            }
         }
         else if (letter == 'O')
         {
-            // Draw O letter as an octagon
+            // Draw O letter as an octagon with thickness
+            int thickness = 8;
             for (int i = 0; i < 8; i++)
             {
                 float angle1 = (float) ((i * Math.PI) / 4.0);
@@ -993,16 +1012,24 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 float cos2 = (float) Math.cos(angle2);
                 float sin2 = (float) Math.sin(angle2);
 
-                float x1 = cx + (cos1 * rightX + sin1 * upX) * halfSize;
-                float y1 = cy + (cos1 * rightY + sin1 * upY) * halfSize;
-                float z1 = cz + (cos1 * rightZ + sin1 * upZ) * halfSize;
+                for (int t = 0; t < thickness; t++)
+                {
+                    float offset = (t / (float) (thickness - 1) - 0.5f) * 0.15f;
+                    float ox = rightX * offset;
+                    float oy = rightY * offset;
+                    float oz = rightZ * offset;
 
-                float x2 = cx + (cos2 * rightX + sin2 * upX) * halfSize;
-                float y2 = cy + (cos2 * rightY + sin2 * upY) * halfSize;
-                float z2 = cz + (cos2 * rightZ + sin2 * upZ) * halfSize;
+                    float x1 = cx + (cos1 * rightX + sin1 * upX) * halfSize;
+                    float y1 = cy + (cos1 * rightY + sin1 * upY) * halfSize;
+                    float z1 = cz + (cos1 * rightZ + sin1 * upZ) * halfSize;
 
-                builder.vertex(x1, y1, z1).color(color.r, color.g, color.b, color.a);
-                builder.vertex(x2, y2, z2).color(color.r, color.g, color.b, color.a);
+                    float x2 = cx + (cos2 * rightX + sin2 * upX) * halfSize;
+                    float y2 = cy + (cos2 * rightY + sin2 * upY) * halfSize;
+                    float z2 = cz + (cos2 * rightZ + sin2 * upZ) * halfSize;
+
+                    builder.vertex(x1 + ox, y1 + oy, z1 + oz).color(color.r, color.g, color.b, color.a);
+                    builder.vertex(x2 + ox, y2 + oy, z2 + oz).color(color.r, color.g, color.b, color.a);
+                }
             }
         }
     }
@@ -1011,6 +1038,20 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     public void render(Vec3d cameraPos, MinecraftClient mc, Profiler profiler)
     {
         boolean renderLines = PortalDataStore.getInstance().getZoneSettings().shouldRenderLines();
+        boolean renderLetters = PortalDataStore.getInstance().getZoneSettings().shouldRenderLetters();
+
+        // Mark letters as dirty every frame so they rebuild with current camera position for billboarding
+        if (renderLetters)
+        {
+            for (PortalRenderCache cache : this.portalRenderCaches.values())
+            {
+                if (cache != null)
+                {
+                    cache.lettersDirty = true;
+                }
+            }
+        }
+
         this.renderPortals(cameraPos, mc, profiler, renderLines);
     }
 
@@ -1025,12 +1066,12 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
 
         PortalZoneSettings settings = PortalDataStore.getInstance().getZoneSettings();
+        boolean showZoneBorders = settings.isShowZoneBorders();
         boolean renderLines = settings.shouldRenderLines();
         boolean renderLetters = settings.shouldRenderLetters();
         double maxRange = mc.options.getViewDistance().getValue() * 16.0D * 2.0D;
         double maxRangeSq = maxRange * maxRange;
 
-        int lettersDrawn = 0;
         for (PortalRenderCache cache : this.portalRenderCaches.values())
         {
             if (cache == null || cache.isInRange(cameraPos, maxRangeSq) == false)
@@ -1038,33 +1079,22 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 continue;
             }
 
-            if (renderLines)
+            if (showZoneBorders)
             {
-                this.drawRenderObject(cache.outlines, cameraPos);
-            }
-            else
-            {
-                this.drawRenderObject(cache.quads, cameraPos);
+                if (renderLines)
+                {
+                    this.drawRenderObject(cache.outlines, cameraPos);
+                }
+                else
+                {
+                    this.drawRenderObject(cache.quads, cameraPos);
+                }
             }
 
             if (renderLetters)
             {
-                if (cache.letters.isStartedPublic() && cache.letters.isUploadedPublic())
-                {
-                    this.drawRenderObject(cache.letters, cameraPos, 8.0f);  // Thicker lines for letters (8.0f instead of default)
-                    lettersDrawn++;
-                }
-                else
-                {
-                    LOGGER.debug("Skipping letters for portal {} - started={}, uploaded={}",
-                               cache.portalIndex, cache.letters.isStartedPublic(), cache.letters.isUploadedPublic());
-                }
+                this.drawRenderObject(cache.letters, cameraPos);
             }
-        }
-
-        if (renderLetters && lettersDrawn > 0)
-        {
-            LOGGER.debug("Drew {} letters", lettersDrawn);
         }
     }
 
@@ -1123,6 +1153,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     private boolean hasVisibleDirtyPortals(Vec3d cameraPos, MinecraftClient mc)
     {
         PortalZoneSettings settings = PortalDataStore.getInstance().getZoneSettings();
+        boolean showZoneBorders = settings.isShowZoneBorders();
         boolean renderLines = settings.shouldRenderLines();
         boolean renderLetters = settings.shouldRenderLetters();
         double maxRange = mc.options.getViewDistance().getValue() * 16.0D * 2.0D;
@@ -1135,16 +1166,19 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 continue;
             }
 
-            if (renderLines)
+            if (showZoneBorders)
             {
-                if (cache.outlinesDirty || cache.outlines.isUploadedPublic() == false)
+                if (renderLines)
+                {
+                    if (cache.outlinesDirty || cache.outlines.isUploadedPublic() == false)
+                    {
+                        return true;
+                    }
+                }
+                else if (cache.quadsDirty || cache.quads.isUploadedPublic() == false)
                 {
                     return true;
                 }
-            }
-            else if (cache.quadsDirty || cache.quads.isUploadedPublic() == false)
-            {
-                return true;
             }
 
             // Check letters dirty state only if render letters is enabled
@@ -1229,7 +1263,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         {
             return new PortalRenderObjectVbo(
                     () -> "minihud-portal:portal_zones/quads/" + this.portalIndex,
-                    MaLiLibPipelines.MINIHUD_SHAPE_OFFSET_NO_CULL);
+                    MaLiLibPipelines.POSITION_COLOR_MASA_LEQUAL_DEPTH_OFFSET_1);
         }
 
         private PortalRenderObjectVbo createOutlines()
