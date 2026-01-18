@@ -2,7 +2,10 @@ package ninja.trek.portal;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -37,6 +40,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     private final List<PortalWorkGroup> pendingGroups = new ArrayList<>();
     private final Int2ObjectOpenHashMap<LongOpenHashSet> positionsByPortal = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectOpenHashMap<PortalRenderCache> portalRenderCaches = new Int2ObjectOpenHashMap<>();
+    private final Map<UUID, LetterRenderCache> currentDimensionLetterCaches = new HashMap<>();
     private final LayerRange layerRange = new LayerRange(this);
 
     private int nextGroupIndex;
@@ -239,7 +243,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             this.loggedNoDataSinceToggle = true;
         }
 
-        if (this.hasData() || (renderLetters && this.searchContext != null && this.searchContext.portals.isEmpty() == false))
+        if (this.hasData() || (renderLetters && this.hasLetterPortals()))
         {
             this.renderThrough = settings.shouldRenderThrough();
             this.renderPortals(cameraPos, mc, profiler, settings.shouldRenderLines());
@@ -272,6 +276,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         this.nextGroupIndex = 0;
         this.positionsByPortal.clear();
         this.clearPortalRenderCaches();
+        this.clearCurrentDimensionLetterCaches();
         this.searchContext = null;
         this.hasData = false;
         this.renderDirty = true;
@@ -297,6 +302,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         this.clearPositions();
         this.searchContext = this.buildSearchContext(world, target);
         this.lastDimensionId = world.getRegistryKey().getValue().toString();
+        this.syncCurrentDimensionLetterCaches(world);
 
         if (this.searchContext == null || this.searchContext.portals.isEmpty())
         {
@@ -332,6 +338,30 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     {
         this.positionsByPortal.clear();
         this.clearPortalRenderCaches();
+    }
+
+    private void syncCurrentDimensionLetterCaches(World world)
+    {
+        this.clearCurrentDimensionLetterCaches();
+        String dimensionId = world.getRegistryKey().getValue().toString();
+
+        for (PortalEntry entry : PortalDataStore.getInstance().getPortals())
+        {
+            if (entry.getDimensionId().equals(dimensionId))
+            {
+                this.currentDimensionLetterCaches.put(entry.getId(), new LetterRenderCache(entry));
+            }
+        }
+    }
+
+    private void clearCurrentDimensionLetterCaches()
+    {
+        for (LetterRenderCache cache : this.currentDimensionLetterCaches.values())
+        {
+            cache.close();
+        }
+
+        this.currentDimensionLetterCaches.clear();
     }
 
     private void addPortalPosition(Int2ObjectOpenHashMap<LongOpenHashSet> positions, int portalIndex, long pos)
@@ -768,9 +798,13 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 PortalCandidate portal = this.searchContext.portals.get(cache.portalIndex);
                 if (portal != null)
                 {
-                    this.buildPortalLetters(cache, cameraPos, portal, target);
+                    this.buildPortalLetters(cache, cameraPos, portal, target.scale);
                 }
             }
+        }
+        if (renderLetters)
+        {
+            this.buildCurrentDimensionLetters(cameraPos, maxRangeSq);
         }
         profiler.pop();
     }
@@ -857,42 +891,51 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         cache.outlinesDirty = false;
     }
 
-    private void buildPortalLetters(PortalRenderCache cache, Vec3d cameraPos, PortalCandidate portal, TargetDimension target)
+    private void buildPortalLetters(PortalRenderCache cache, Vec3d cameraPos, PortalCandidate portal, double scale)
     {
         if (cache.lettersDirty == false && cache.letters.isUploadedPublic())
         {
             return;
         }
 
-        BufferBuilder builder = cache.letters.start(
-                () -> "minihud-portal:portal_zones/letters/" + cache.portalIndex,
+        this.buildPortalLetters(cache.letters, cameraPos, portal.bounds(), cache.color, portal.dimensionId(),
+                                scale, Integer.toString(cache.portalIndex));
+
+        cache.lettersDirty = false;
+    }
+
+    private void buildPortalLetters(PortalRenderObjectVbo letters, Vec3d cameraPos, PortalBounds bounds, int color,
+                                    String portalDimensionId, double scale, String cacheKey)
+    {
+        BufferBuilder builder = letters.start(
+                () -> "minihud-portal:portal_zones/letters/" + cacheKey,
                 MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL);  // No depth test - renders through walls
 
-        // Calculate portal center (portal bounds are in target dimension coordinates)
-        double centerX = (portal.bounds().getMinX() + portal.bounds().getMaxX()) / 2.0;
-        double centerY = (portal.bounds().getMinY() + portal.bounds().getMaxY()) / 2.0;
-        double centerZ = (portal.bounds().getMinZ() + portal.bounds().getMaxZ()) / 2.0;
+        // Calculate portal center (portal bounds are in portal dimension coordinates)
+        double centerX = (bounds.getMinX() + bounds.getMaxX()) / 2.0;
+        double centerY = (bounds.getMinY() + bounds.getMaxY()) / 2.0;
+        double centerZ = (bounds.getMinZ() + bounds.getMaxZ()) / 2.0;
 
         // Translate to source dimension position (inverse of the scale)
-        double translatedCenterX = centerX / target.scale;
-        double translatedCenterZ = centerZ / target.scale;
+        double translatedCenterX = centerX / scale;
+        double translatedCenterZ = centerZ / scale;
 
         // Calculate letter size based on portal's actual size (not scaled)
-        double portalWidth = portal.bounds().getMaxX() - portal.bounds().getMinX() + 1.0;
-        double portalHeight = portal.bounds().getMaxY() - portal.bounds().getMinY() + 1.0;
+        double portalWidth = bounds.getMaxX() - bounds.getMinX() + 1.0;
+        double portalHeight = bounds.getMaxY() - bounds.getMinY() + 1.0;
         double letterSize = Math.max(portalWidth, portalHeight);
 
         // Determine letter based on portal's own dimension
-        boolean isNether = portal.dimensionId().equals(World.NETHER.getValue().toString());
+        boolean isNether = portalDimensionId.equals(World.NETHER.getValue().toString());
 
         char letterChar = isNether ? 'N' : 'O';
         LOGGER.info("Building letter '{}' for portal {} at ({}, {}, {}), size={}, portalDim={}",
-                   letterChar, cache.portalIndex, translatedCenterX, centerY, translatedCenterZ,
-                   letterSize, portal.dimensionId());
+                   letterChar, cacheKey, translatedCenterX, centerY, translatedCenterZ,
+                   letterSize, portalDimensionId);
 
-        Color4f color = Color4f.fromColor(cache.color, 1.0f);
+        Color4f letterColor = Color4f.fromColor(color, 1.0f);
         this.drawBillboardedLetter(builder, translatedCenterX, centerY, translatedCenterZ,
-                                   letterSize, letterChar, color, cameraPos);
+                                   letterSize, letterChar, letterColor, cameraPos);
 
         try
         {
@@ -900,21 +943,19 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
             if (meshData != null)
             {
-                cache.letters.upload(meshData, false);
+                letters.upload(meshData, false);
                 meshData.close();
-                LOGGER.info("Uploaded letter mesh for portal {}", cache.portalIndex);
+                LOGGER.info("Uploaded letter mesh for portal {}", cacheKey);
             }
             else
             {
-                LOGGER.warn("Failed to build letter mesh for portal {} - meshData is null", cache.portalIndex);
+                LOGGER.warn("Failed to build letter mesh for portal {} - meshData is null", cacheKey);
             }
         }
         catch (Exception e)
         {
-            LOGGER.error("Error building letter mesh for portal {}", cache.portalIndex, e);
+            LOGGER.error("Error building letter mesh for portal {}", cacheKey, e);
         }
-
-        cache.lettersDirty = false;
     }
 
     private void drawBillboardedLetter(BufferBuilder builder, double worldX, double worldY, double worldZ,
@@ -1062,6 +1103,13 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                     cache.lettersDirty = true;
                 }
             }
+            for (LetterRenderCache cache : this.currentDimensionLetterCaches.values())
+            {
+                if (cache != null)
+                {
+                    cache.lettersDirty = true;
+                }
+            }
         }
 
         this.renderPortals(cameraPos, mc, profiler, renderLines);
@@ -1105,6 +1153,19 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
             if (renderLetters)
             {
+                this.drawRenderObject(cache.letters, cameraPos);
+            }
+        }
+
+        if (renderLetters)
+        {
+            for (LetterRenderCache cache : this.currentDimensionLetterCaches.values())
+            {
+                if (cache == null || cache.isInRange(cameraPos, maxRangeSq) == false)
+                {
+                    continue;
+                }
+
                 this.drawRenderObject(cache.letters, cameraPos);
             }
         }
@@ -1200,7 +1261,54 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             }
         }
 
+        if (renderLetters)
+        {
+            for (LetterRenderCache cache : this.currentDimensionLetterCaches.values())
+            {
+                if (cache == null || cache.isInRange(cameraPos, maxRangeSq) == false)
+                {
+                    continue;
+                }
+
+                if (cache.lettersDirty || cache.letters.isUploadedPublic() == false)
+                {
+                    return true;
+                }
+            }
+        }
+
         return false;
+    }
+
+    private boolean hasLetterPortals()
+    {
+        if (this.searchContext != null && this.searchContext.portals.isEmpty() == false)
+        {
+            return true;
+        }
+
+        return this.currentDimensionLetterCaches.isEmpty() == false;
+    }
+
+    private void buildCurrentDimensionLetters(Vec3d cameraPos, double maxRangeSq)
+    {
+        for (LetterRenderCache cache : this.currentDimensionLetterCaches.values())
+        {
+            if (cache == null || cache.isInRange(cameraPos, maxRangeSq) == false)
+            {
+                continue;
+            }
+
+            if (cache.lettersDirty == false && cache.letters.isUploadedPublic())
+            {
+                continue;
+            }
+
+            PortalEntry portal = cache.portal;
+            this.buildPortalLetters(cache.letters, cameraPos, portal.getBounds(), cache.color,
+                                    portal.getDimensionId(), 1.0D, cache.key);
+            cache.lettersDirty = false;
+        }
     }
 
     @Nullable
@@ -1327,6 +1435,40 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         {
             this.quads.closePublic();
             this.outlines.closePublic();
+            this.letters.closePublic();
+        }
+    }
+
+    private static class LetterRenderCache
+    {
+        private final PortalEntry portal;
+        private final PortalRenderObjectVbo letters;
+        private final int color;
+        private final String key;
+        private boolean lettersDirty = true;
+
+        private LetterRenderCache(PortalEntry portal)
+        {
+            this.portal = portal;
+            this.color = portal.getColor();
+            this.key = "current/" + portal.getId().toString();
+            this.letters = new PortalRenderObjectVbo(
+                    () -> "minihud-portal:portal_zones/letters/" + this.key,
+                    MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL);
+        }
+
+        private boolean isInRange(Vec3d cameraPos, double maxRangeSq)
+        {
+            PortalBounds bounds = this.portal.getBounds();
+            double centerX = (bounds.getMinX() + bounds.getMaxX()) / 2.0;
+            double centerZ = (bounds.getMinZ() + bounds.getMaxZ()) / 2.0;
+            double dx = cameraPos.x - centerX;
+            double dz = cameraPos.z - centerZ;
+            return (dx * dx + dz * dz) <= maxRangeSq;
+        }
+
+        private void close()
+        {
             this.letters.closePublic();
         }
     }
