@@ -54,6 +54,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     private boolean loggedNoDataSinceToggle;
     private boolean loggedMissingTarget;
     private boolean pendingToggleDiagnostics;
+    private float lastCameraYaw = Float.NaN;
+    private float lastCameraPitch = Float.NaN;
     private String lastDimensionId = "";
     private PortalSearchContext searchContext;
 
@@ -114,6 +116,11 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         if (mc.world == null)
         {
             return false;
+        }
+
+        if (this.shouldUpdateLettersForCamera(mc))
+        {
+            return true;
         }
 
         Vec3d entityPos = new Vec3d(entity.getX(), entity.getY(), entity.getZ());
@@ -255,6 +262,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         this.lastShowZoneBorders = showZoneBorders;
         this.lastRenderLines = settings.shouldRenderLines();
         this.lastRenderThrough = settings.shouldRenderThrough();
+        this.updateCameraAngles(mc);
     }
 
     @Override
@@ -934,8 +942,9 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                    letterSize, portalDimensionId);
 
         Color4f letterColor = Color4f.fromColor(color, 1.0f);
+        Vec3d viewDir = this.getCameraViewDirection();
         this.drawBillboardedLetter(builder, translatedCenterX, centerY, translatedCenterZ,
-                                   letterSize, letterChar, letterColor, cameraPos);
+                                   letterSize, letterChar, letterColor, cameraPos, viewDir);
 
         try
         {
@@ -959,7 +968,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     }
 
     private void drawBillboardedLetter(BufferBuilder builder, double worldX, double worldY, double worldZ,
-                                       double size, char letter, Color4f color, Vec3d cameraPos)
+                                       double size, char letter, Color4f color, Vec3d cameraPos, Vec3d viewDir)
     {
         // Camera-relative position
         float cx = (float) (worldX - cameraPos.x);
@@ -969,10 +978,10 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
         // For proper billboarding, we need to construct a coordinate system
         // where the letter faces the camera.
-        // View direction: from letter to camera (negative of camera-relative position)
-        float viewX = -cx;
-        float viewY = -cy;
-        float viewZ = -cz;
+        // View direction: from letter to camera (opposite of camera look direction)
+        float viewX = (float) -viewDir.x;
+        float viewY = (float) -viewDir.y;
+        float viewZ = (float) -viewDir.z;
         float viewDist = (float) Math.sqrt(viewX * viewX + viewY * viewY + viewZ * viewZ);
 
         if (viewDist < 0.0001f)
@@ -1084,6 +1093,69 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                     builder.vertex(x2 + ox, y2 + oy, z2 + oz).color(color.r, color.g, color.b, color.a);
                 }
             }
+        }
+    }
+
+    private Vec3d getCameraViewDirection()
+    {
+        MinecraftClient mc = MinecraftClient.getInstance();
+
+        if (mc.gameRenderer != null && mc.gameRenderer.getCamera() != null)
+        {
+            float pitch = mc.gameRenderer.getCamera().getPitch();
+            float yaw = mc.gameRenderer.getCamera().getYaw();
+            return Vec3d.fromPolar(pitch, yaw);
+        }
+
+        return new Vec3d(0.0, 0.0, 1.0);
+    }
+
+    private boolean shouldUpdateLettersForCamera(MinecraftClient mc)
+    {
+        if (PortalDataStore.getInstance().getZoneSettings().shouldRenderLetters() == false)
+        {
+            return false;
+        }
+
+        if (mc.gameRenderer == null || mc.gameRenderer.getCamera() == null)
+        {
+            return false;
+        }
+
+        float yaw = mc.gameRenderer.getCamera().getYaw();
+        float pitch = mc.gameRenderer.getCamera().getPitch();
+
+        if (Float.isNaN(this.lastCameraYaw) || Float.isNaN(this.lastCameraPitch) ||
+            Math.abs(yaw - this.lastCameraYaw) > 0.001f || Math.abs(pitch - this.lastCameraPitch) > 0.001f)
+        {
+            this.markAllLettersDirty();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void updateCameraAngles(MinecraftClient mc)
+    {
+        if (mc.gameRenderer == null || mc.gameRenderer.getCamera() == null)
+        {
+            return;
+        }
+
+        this.lastCameraYaw = mc.gameRenderer.getCamera().getYaw();
+        this.lastCameraPitch = mc.gameRenderer.getCamera().getPitch();
+    }
+
+    private void markAllLettersDirty()
+    {
+        for (PortalRenderCache cache : this.portalRenderCaches.values())
+        {
+            cache.lettersDirty = true;
+        }
+
+        for (LetterRenderCache cache : this.currentDimensionLetterCaches.values())
+        {
+            cache.lettersDirty = true;
         }
     }
 
