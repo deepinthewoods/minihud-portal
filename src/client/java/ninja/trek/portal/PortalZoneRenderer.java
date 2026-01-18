@@ -443,11 +443,14 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             {
                 for (int x = minX; x <= maxX; ++x)
                 {
+                    // Only process positions within this portal's influence
                     if (this.isWithinInfluence(x, y, z, portal, target, context) == false)
                     {
                         continue;
                     }
 
+                    // Mark as boundary if this position has any neighbor outside the influence
+                    // This creates a complete perimeter around the zone
                     if (this.isBoundaryForPortal(x, y, z, portal, target, context))
                     {
                         this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(x, y, z));
@@ -480,6 +483,10 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                         continue;
                     }
 
+                    // Check if this position is on the boundary of its zone.
+                    // A position is a boundary if it belongs to zone and has at least one
+                    // neighbor that is not part of zone (could be a different zone or no zone).
+                    // This ensures each zone gets a complete perimeter border.
                     if (this.isBoundaryInGroup(x, y, z, zone, target, context, group.portalIndices))
                     {
                         this.addPortalPosition(this.positionsByPortal, zone, BlockPos.asLong(x, y, z));
@@ -492,6 +499,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     private boolean isBoundaryForPortal(int worldX, int worldY, int worldZ, PortalCandidate portal,
                                         TargetDimension target, PortalSearchContext context)
     {
+        // A position is on the boundary if it has at least one neighbor outside the influence
+        // This creates a complete perimeter border around the zone
         return this.isWithinInfluence(worldX + 1, worldY, worldZ, portal, target, context) == false ||
                this.isWithinInfluence(worldX - 1, worldY, worldZ, portal, target, context) == false ||
                this.isWithinInfluence(worldX, worldY + 1, worldZ, portal, target, context) == false ||
@@ -503,6 +512,9 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     private boolean isBoundaryInGroup(int worldX, int worldY, int worldZ, short currentZone,
                                       TargetDimension target, PortalSearchContext context, int[] portalIndices)
     {
+        // A position is on the boundary of currentZone if it has at least one neighbor
+        // that is NOT part of currentZone (could be another zone or no zone)
+        // This creates a complete perimeter border around each zone
         return this.resolvePortalIndex(worldX + 1, worldY, worldZ, target, context, portalIndices) != currentZone ||
                this.resolvePortalIndex(worldX - 1, worldY, worldZ, target, context, portalIndices) != currentZone ||
                this.resolvePortalIndex(worldX, worldY + 1, worldZ, target, context, portalIndices) != currentZone ||
