@@ -129,6 +129,14 @@ public class GuiPortals extends GuiListBase<Object, WidgetListEntryBase<Object>,
         ButtonOnOff renderLettersButton = new ButtonOnOff(0, 0, -1, false,
                 "minihud-portal.gui.button.portal_zone_letters", settings.shouldRenderLetters());
         layout = this.placeTopRowButton(layout, renderLettersButton);
+
+        ButtonOnOff simpleModeButton = new ButtonOnOff(0, 0, -1, false,
+                "minihud-portal.gui.button.portal_simple_mode", settings.isSimpleMode());
+        layout = this.placeTopRowButton(layout, simpleModeButton);
+
+        ButtonOnOff disableScanningButton = new ButtonOnOff(0, 0, -1, false,
+                "minihud-portal.gui.button.disable_portal_scanning", settings.isPortalScanningDisabled());
+        layout = this.placeTopRowButton(layout, disableScanningButton);
         x = layout.x();
         y = layout.y();
         rows = layout.rows();
@@ -163,6 +171,22 @@ public class GuiPortals extends GuiListBase<Object, WidgetListEntryBase<Object>,
             PortalDataStore.getInstance().markDirty();
             PortalZoneRenderer.INSTANCE.onSettingsChanged();
             LOGGER.warn("Portal zone letters toggled via GUI: renderLetters={}", settings.shouldRenderLetters());
+        });
+
+        this.addButton(simpleModeButton, (btn, mouseBtn) -> {
+            settings.toggleSimpleMode();
+            simpleModeButton.updateDisplayString(settings.isSimpleMode());
+            PortalDataStore.getInstance().markDirty();
+            PortalZoneRenderer.INSTANCE.onSettingsChanged();
+            LOGGER.warn("Portal simple mode toggled via GUI: simpleMode={}", settings.isSimpleMode());
+        });
+
+        this.addButton(disableScanningButton, (btn, mouseBtn) -> {
+            settings.toggleDisablePortalScanning();
+            disableScanningButton.updateDisplayString(settings.isPortalScanningDisabled());
+            PortalDataStore.getInstance().markDirty();
+            // PortalZoneRenderer.INSTANCE.onSettingsChanged(); // Not needed for scanning logic, but consistent
+            LOGGER.warn("Portal scanning disabled toggled via GUI: disablePortalScanning={}", settings.isPortalScanningDisabled());
         });
 
         if (rows > 1)

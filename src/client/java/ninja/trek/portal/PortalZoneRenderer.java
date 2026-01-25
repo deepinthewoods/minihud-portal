@@ -36,6 +36,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
     private static final int MAX_GROUPS_PER_TICK = 1;
     private static final short NO_PORTAL = -1;
+    private static final float LETTER_STROKE_PIXELS = 2.5f;
+    private static final float LETTER_STROKE_RELATIVE_FALLBACK = 0.12f;
 
     private final List<PortalWorkGroup> pendingGroups = new ArrayList<>();
     private final Int2ObjectOpenHashMap<LongOpenHashSet> positionsByPortal = new Int2ObjectOpenHashMap<>();
@@ -51,6 +53,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     private boolean lastShowZoneBorders;
     private boolean lastRenderLines;
     private boolean lastRenderThrough;
+    private boolean lastSimpleMode;
     private boolean loggedNoDataSinceToggle;
     private boolean loggedMissingTarget;
     private boolean pendingToggleDiagnostics;
@@ -216,6 +219,11 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             this.markAllPortalsDirty(true, false);
         }
 
+        if (settings.isSimpleMode() != this.lastSimpleMode)
+        {
+            this.needsFullRebuild = true;
+        }
+
         String dimensionId = world.getRegistryKey().getValue().toString();
 
         if (this.needsFullRebuild || this.portalDataDirty ||
@@ -262,6 +270,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         this.lastShowZoneBorders = showZoneBorders;
         this.lastRenderLines = settings.shouldRenderLines();
         this.lastRenderThrough = settings.shouldRenderThrough();
+        this.lastSimpleMode = settings.isSimpleMode();
         this.updateCameraAngles(mc);
     }
 
@@ -448,13 +457,18 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
     private void processGroup(PortalWorkGroup group, TargetDimension target, PortalSearchContext context)
     {
-        if (group.portalIndices.length == 1)
+        boolean simpleMode = PortalDataStore.getInstance().getZoneSettings().isSimpleMode();
+
+        if (group.portalIndices.length == 1 || simpleMode)
         {
-            int portalIndex = group.portalIndices[0];
-            PortalCandidate portal = context.portals.get(portalIndex);
-            PortalInfluence influence = context.influences.get(portalIndex);
-            this.processIsolatedPortal(portalIndex, portal, influence, target, context);
-            this.markPortalDirty(portalIndex, true);
+            // In simple mode, process each portal as isolated (show full influence without overlap calculations)
+            for (int portalIndex : group.portalIndices)
+            {
+                PortalCandidate portal = context.portals.get(portalIndex);
+                PortalInfluence influence = context.influences.get(portalIndex);
+                this.processIsolatedPortal(portalIndex, portal, influence, target, context);
+                this.markPortalDirty(portalIndex, true);
+            }
             return;
         }
 
@@ -475,23 +489,47 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         int minZ = influence.minZ();
         int maxZ = influence.maxZ();
 
-        for (int y = minY; y <= maxY; ++y)
+        // 1. Horizontal faces (Top/Bottom) - Full Coverage
+        for (int x = minX; x <= maxX; ++x)
         {
             for (int z = minZ; z <= maxZ; ++z)
             {
+                this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(x, minY, z));
+                if (maxY > minY)
+                {
+                    this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(x, maxY, z));
+                }
+            }
+        }
+
+        // 2. Vertical faces (Sides) - Between Top/Bottom
+        if (maxY > minY + 1)
+        {
+            // North/South (along X) - Full width
+            for (int y = minY + 1; y < maxY; ++y)
+            {
                 for (int x = minX; x <= maxX; ++x)
                 {
-                    // Only process positions within this portal's influence
-                    if (this.isWithinInfluence(x, y, z, portal, target, context) == false)
+                    this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(x, y, minZ));
+                    if (maxZ > minZ)
                     {
-                        continue;
+                        this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(x, y, maxZ));
                     }
+                }
+            }
 
-                    // Mark as boundary if this position has any neighbor outside the influence
-                    // This creates a complete perimeter around the zone
-                    if (this.isBoundaryForPortal(x, y, z, portal, target, context))
+            // East/West (along Z) - Between North/South
+            if (maxZ > minZ + 1)
+            {
+                for (int y = minY + 1; y < maxY; ++y)
+                {
+                    for (int z = minZ + 1; z < maxZ; ++z)
                     {
-                        this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(x, y, z));
+                        this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(minX, y, z));
+                        if (maxX > minX)
+                        {
+                            this.addPortalPosition(this.positionsByPortal, portalIndex, BlockPos.asLong(maxX, y, z));
+                        }
                     }
                 }
             }
@@ -917,7 +955,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     {
         BufferBuilder builder = letters.start(
                 () -> "minihud-portal:portal_zones/letters/" + cacheKey,
-                MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL);  // No depth test - renders through walls
+                MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL);  // No depth test - renders through walls
 
         // Calculate portal center (portal bounds are in portal dimension coordinates)
         double centerX = (bounds.getMinX() + bounds.getMaxX() + 1.0) / 2.0;
@@ -980,6 +1018,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         float cz = (float) (worldZ - cameraPos.z);
         float halfWidth = (float) (width / 2.0);
         float halfHeight = (float) (height / 2.0);
+        float stroke = this.computeLetterStroke(worldX, worldY, worldZ, halfWidth, halfHeight, cameraPos);
 
         // For proper billboarding, we need to construct a coordinate system
         // where the letter faces the camera.
@@ -1031,76 +1070,94 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         if (letter == 'N')
         {
             // Draw N letter using billboarded coordinate system
-            // Left vertical line position
-            float leftX = cx - rightX * halfWidth;
-            float leftZ = cz - rightZ * halfWidth;
-
-            // Right vertical line position
-            float rightVertX = cx + rightX * halfWidth;
-            float rightVertZ = cz + rightZ * halfWidth;
-
-            // Bottom and top positions along up vector
-            float bottomY = cy - upY * halfHeight;
-            float topY = cy + upY * halfHeight;
-
-            // Draw multiple parallel lines for thickness
-            int thickness = 8;
-            for (int t = 0; t < thickness; t++)
-            {
-                float offset = (t / (float) (thickness - 1) - 0.5f) * 0.15f;
-                float ox = rightX * offset;
-                float oy = rightY * offset;
-                float oz = rightZ * offset;
-
-                // Left vertical line
-                builder.vertex(leftX + ox, bottomY + oy, leftZ + oz).color(color.r, color.g, color.b, color.a);
-                builder.vertex(leftX + ox, topY + oy, leftZ + oz).color(color.r, color.g, color.b, color.a);
-
-                // Right vertical line
-                builder.vertex(rightVertX + ox, bottomY + oy, rightVertZ + oz).color(color.r, color.g, color.b, color.a);
-                builder.vertex(rightVertX + ox, topY + oy, rightVertZ + oz).color(color.r, color.g, color.b, color.a);
-
-                // Diagonal line
-                builder.vertex(leftX + ox, topY + oy, leftZ + oz).color(color.r, color.g, color.b, color.a);
-                builder.vertex(rightVertX + ox, bottomY + oy, rightVertZ + oz).color(color.r, color.g, color.b, color.a);
-            }
+            // Left vertical bar
+            this.addAxisAlignedQuad(builder, cx, cy, cz, rightX, rightY, rightZ, upX, upY, upZ,
+                                    -halfWidth, -halfHeight, -halfWidth + stroke, halfHeight, color);
+            // Right vertical bar
+            this.addAxisAlignedQuad(builder, cx, cy, cz, rightX, rightY, rightZ, upX, upY, upZ,
+                                    halfWidth - stroke, -halfHeight, halfWidth, halfHeight, color);
+            // Diagonal bar
+            this.addStrokeQuad(builder, cx, cy, cz, rightX, rightY, rightZ, upX, upY, upZ,
+                               -halfWidth + stroke, halfHeight, halfWidth - stroke, -halfHeight, stroke, color);
         }
         else if (letter == 'O')
         {
-            // Draw O letter as an octagon with thickness
-            int thickness = 8;
-            for (int i = 0; i < 8; i++)
+            // Draw O letter as a multi-segment ring
+            final int segments = 16;
+            final float step = (float) ((Math.PI * 2.0) / segments);
+            for (int i = 0; i < segments; i++)
             {
-                float angle1 = (float) ((i * Math.PI) / 4.0);
-                float angle2 = (float) (((i + 1) * Math.PI) / 4.0);
+                float angle1 = i * step;
+                float angle2 = (i + 1) * step;
 
                 float cos1 = (float) Math.cos(angle1);
                 float sin1 = (float) Math.sin(angle1);
                 float cos2 = (float) Math.cos(angle2);
                 float sin2 = (float) Math.sin(angle2);
 
-                for (int t = 0; t < thickness; t++)
-                {
-                    float offset = (t / (float) (thickness - 1) - 0.5f) * 0.15f;
-                    float ox = rightX * offset;
-                    float oy = rightY * offset;
-                    float oz = rightZ * offset;
+                float outerX1 = cos1 * halfWidth;
+                float outerY1 = sin1 * halfHeight;
+                float outerX2 = cos2 * halfWidth;
+                float outerY2 = sin2 * halfHeight;
+                float innerX1 = cos1 * (halfWidth - stroke);
+                float innerY1 = sin1 * (halfHeight - stroke);
+                float innerX2 = cos2 * (halfWidth - stroke);
+                float innerY2 = sin2 * (halfHeight - stroke);
 
-                    float x1 = cx + (cos1 * rightX * halfWidth) + (sin1 * upX * halfHeight);
-                    float y1 = cy + (cos1 * rightY * halfWidth) + (sin1 * upY * halfHeight);
-                    float z1 = cz + (cos1 * rightZ * halfWidth) + (sin1 * upZ * halfHeight);
-
-                    float x2 = cx + (cos2 * rightX * halfWidth) + (sin2 * upX * halfHeight);
-                    float y2 = cy + (cos2 * rightY * halfWidth) + (sin2 * upY * halfHeight);
-                    float z2 = cz + (cos2 * rightZ * halfWidth) + (sin2 * upZ * halfHeight);
-
-                    builder.vertex(x1 + ox, y1 + oy, z1 + oz).color(color.r, color.g, color.b, color.a);
-                    builder.vertex(x2 + ox, y2 + oy, z2 + oz).color(color.r, color.g, color.b, color.a);
-                }
+                this.addQuad(builder, cx, cy, cz, rightX, rightY, rightZ, upX, upY, upZ,
+                             outerX1, outerY1, outerX2, outerY2, innerX2, innerY2, innerX1, innerY1, color);
             }
         }
     }
 
+    private void addAxisAlignedQuad(BufferBuilder builder, float cx, float cy, float cz,
+                                    float rightX, float rightY, float rightZ,
+                                    float upX, float upY, float upZ,
+                                    float x1, float y1, float x2, float y2, Color4f color)
+    {
+        this.addQuad(builder, cx, cy, cz, rightX, rightY, rightZ, upX, upY, upZ,
+                     x1, y1, x2, y1, x2, y2, x1, y2, color);
+    }
+
+    private void addStrokeQuad(BufferBuilder builder, float cx, float cy, float cz,
+                               float rightX, float rightY, float rightZ,
+                               float upX, float upY, float upZ,
+                               float x1, float y1, float x2, float y2,
+                               float stroke, Color4f color)
+    {
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float length = (float) Math.sqrt(dx * dx + dy * dy);
+        if (length < 0.0001f)
+        {
+            return;
+        }
+
+        float nx = -dy / length;
+        float ny = dx / length;
+        float halfStroke = stroke * 0.5f;
+        float ox = nx * halfStroke;
+        float oy = ny * halfStroke;
+
+        this.addQuad(builder, cx, cy, cz, rightX, rightY, rightZ, upX, upY, upZ,
+                     x1 + ox, y1 + oy, x2 + ox, y2 + oy, x2 - ox, y2 - oy, x1 - ox, y1 - oy, color);
+    }
+
+    private void addQuad(BufferBuilder builder, float cx, float cy, float cz,
+                         float rightX, float rightY, float rightZ,
+                         float upX, float upY, float upZ,
+                         float x1, float y1, float x2, float y2,
+                         float x3, float y3, float x4, float y4, Color4f color)
+    {
+        builder.vertex(cx + rightX * x1 + upX * y1, cy + rightY * x1 + upY * y1, cz + rightZ * x1 + upZ * y1)
+               .color(color.r, color.g, color.b, color.a);
+        builder.vertex(cx + rightX * x2 + upX * y2, cy + rightY * x2 + upY * y2, cz + rightZ * x2 + upZ * y2)
+               .color(color.r, color.g, color.b, color.a);
+        builder.vertex(cx + rightX * x3 + upX * y3, cy + rightY * x3 + upY * y3, cz + rightZ * x3 + upZ * y3)
+               .color(color.r, color.g, color.b, color.a);
+        builder.vertex(cx + rightX * x4 + upX * y4, cy + rightY * x4 + upY * y4, cz + rightZ * x4 + upZ * y4)
+               .color(color.r, color.g, color.b, color.a);
+    }
     private Vec3d getCameraViewDirection()
     {
         MinecraftClient mc = MinecraftClient.getInstance();
@@ -1113,6 +1170,42 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
 
         return new Vec3d(0.0, 0.0, 1.0);
+    }
+
+    private float computeLetterStroke(double worldX, double worldY, double worldZ,
+                                      float halfWidth, float halfHeight, Vec3d cameraPos)
+    {
+        if (halfWidth <= 0.0f || halfHeight <= 0.0f)
+        {
+            return 0.0f;
+        }
+
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.gameRenderer == null || mc.gameRenderer.getCamera() == null || mc.getWindow() == null)
+        {
+            return Math.min(halfWidth, halfHeight) * LETTER_STROKE_RELATIVE_FALLBACK;
+        }
+
+        int framebufferHeight = mc.getWindow().getFramebufferHeight();
+        if (framebufferHeight <= 0)
+        {
+            return Math.min(halfWidth, halfHeight) * LETTER_STROKE_RELATIVE_FALLBACK;
+        }
+
+        double dx = worldX - cameraPos.x;
+        double dy = worldY - cameraPos.y;
+        double dz = worldZ - cameraPos.z;
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (distance < 0.01)
+        {
+            distance = 0.01;
+        }
+
+        double fovDegrees = mc.options.getFov().getValue();
+        double fovRadians = Math.toRadians(fovDegrees);
+        double worldPerPixel = 2.0 * distance * Math.tan(fovRadians / 2.0) / framebufferHeight;
+        float stroke = (float) (LETTER_STROKE_PIXELS * worldPerPixel);
+        return Math.min(stroke, Math.min(halfWidth, halfHeight));
     }
 
     private boolean shouldUpdateLettersForCamera(MinecraftClient mc)
@@ -1474,7 +1567,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         {
             return new PortalRenderObjectVbo(
                     () -> "minihud-portal:portal_zones/letters/" + this.portalIndex,
-                    MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL);  // No depth test - renders through walls
+                    MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL);  // No depth test - renders through walls
         }
 
         private boolean isInRange(Vec3d cameraPos, double maxRangeSq)
@@ -1531,7 +1624,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             this.key = "current/" + portal.getId().toString();
             this.letters = new PortalRenderObjectVbo(
                     () -> "minihud-portal:portal_zones/letters/" + this.key,
-                    MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL);
+                    MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL);
         }
 
         private boolean isInRange(Vec3d cameraPos, double maxRangeSq)

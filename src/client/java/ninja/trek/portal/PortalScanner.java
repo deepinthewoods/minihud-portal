@@ -39,11 +39,20 @@ public class PortalScanner
 
     public void onChunkLoaded(int chunkX, int chunkZ)
     {
+        if (PortalDataStore.getInstance().getZoneSettings().isPortalScanningDisabled())
+        {
+            return;
+        }
         this.enqueueChunk(new ChunkPos(chunkX, chunkZ));
     }
 
     public void onBlockUpdate(BlockPos pos, BlockState state)
     {
+        if (PortalDataStore.getInstance().getZoneSettings().isPortalScanningDisabled())
+        {
+            return;
+        }
+
         MinecraftClient mc = MinecraftClient.getInstance();
         World world = mc.world;
 
@@ -63,7 +72,7 @@ public class PortalScanner
 
     public void tick(MinecraftClient mc)
     {
-        if (mc.world == null || this.queue.isEmpty())
+        if (mc.world == null || this.queue.isEmpty() || PortalDataStore.getInstance().getZoneSettings().isPortalScanningDisabled())
         {
             return;
         }

@@ -9,6 +9,8 @@ public class PortalZoneSettings
     private boolean renderLines;
     private boolean renderThrough;
     private boolean renderLetters;
+    private boolean simpleMode;
+    private boolean disablePortalScanning;
 
     public boolean isShowZoneBorders()
     {
@@ -28,6 +30,16 @@ public class PortalZoneSettings
     public boolean shouldRenderLetters()
     {
         return this.renderLetters;
+    }
+
+    public boolean isSimpleMode()
+    {
+        return this.simpleMode;
+    }
+
+    public boolean isPortalScanningDisabled()
+    {
+        return this.disablePortalScanning;
     }
 
     public void setShowZoneBorders(boolean showZoneBorders)
@@ -50,6 +62,16 @@ public class PortalZoneSettings
         this.renderLetters = renderLetters;
     }
 
+    public void setSimpleMode(boolean simpleMode)
+    {
+        this.simpleMode = simpleMode;
+    }
+
+    public void setDisablePortalScanning(boolean disablePortalScanning)
+    {
+        this.disablePortalScanning = disablePortalScanning;
+    }
+
     public void toggleShowZoneBorders()
     {
         this.showZoneBorders = !this.showZoneBorders;
@@ -70,12 +92,24 @@ public class PortalZoneSettings
         this.renderLetters = !this.renderLetters;
     }
 
+    public void toggleSimpleMode()
+    {
+        this.simpleMode = !this.simpleMode;
+    }
+
+    public void toggleDisablePortalScanning()
+    {
+        this.disablePortalScanning = !this.disablePortalScanning;
+    }
+
     public void reset()
     {
         this.showZoneBorders = false;
         this.renderLines = false;
         this.renderThrough = false;
         this.renderLetters = false;
+        this.simpleMode = false;
+        this.disablePortalScanning = false;
     }
 
     public JsonObject toJson()
@@ -85,6 +119,8 @@ public class PortalZoneSettings
         obj.addProperty("render_lines", this.renderLines);
         obj.addProperty("render_through", this.renderThrough);
         obj.addProperty("render_letters", this.renderLetters);
+        obj.addProperty("simple_mode", this.simpleMode);
+        obj.addProperty("disable_portal_scanning", this.disablePortalScanning);
         return obj;
     }
 
@@ -99,5 +135,7 @@ public class PortalZoneSettings
         this.renderLines = JsonUtils.getBooleanOrDefault(obj, "render_lines", this.renderLines);
         this.renderThrough = JsonUtils.getBooleanOrDefault(obj, "render_through", this.renderThrough);
         this.renderLetters = JsonUtils.getBooleanOrDefault(obj, "render_letters", this.renderLetters);
+        this.simpleMode = JsonUtils.getBooleanOrDefault(obj, "simple_mode", this.simpleMode);
+        this.disablePortalScanning = JsonUtils.getBooleanOrDefault(obj, "disable_portal_scanning", this.disablePortalScanning);
     }
 }
