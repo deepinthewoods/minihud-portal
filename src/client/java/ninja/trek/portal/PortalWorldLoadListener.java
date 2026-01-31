@@ -1,20 +1,20 @@
 package ninja.trek.portal;
 
 import fi.dy.masa.malilib.interfaces.IWorldLoadListener;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.RegistryAccess;
 import ninja.trek.portal.PortalZoneRenderer;
 
 public class PortalWorldLoadListener implements IWorldLoadListener
 {
     @Override
-    public void onWorldLoadImmutable(DynamicRegistryManager.Immutable immutable)
+    public void onWorldLoadImmutable(RegistryAccess.Frozen immutable)
     {
     }
 
     @Override
-    public void onWorldLoadPre(ClientWorld worldBefore, ClientWorld worldAfter, MinecraftClient mc)
+    public void onWorldLoadPre(ClientLevel worldBefore, ClientLevel worldAfter, Minecraft mc)
     {
         if (worldBefore != null && worldAfter == null)
         {
@@ -23,7 +23,7 @@ public class PortalWorldLoadListener implements IWorldLoadListener
     }
 
     @Override
-    public void onWorldLoadPost(ClientWorld worldBefore, ClientWorld worldAfter, MinecraftClient mc)
+    public void onWorldLoadPost(ClientLevel worldBefore, ClientLevel worldAfter, Minecraft mc)
     {
         if (worldAfter == null)
         {

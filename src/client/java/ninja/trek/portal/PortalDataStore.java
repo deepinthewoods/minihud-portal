@@ -7,6 +7,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -14,11 +19,6 @@ import com.google.gson.JsonPrimitive;
 import fi.dy.masa.malilib.util.FileUtils;
 import fi.dy.masa.malilib.util.JsonUtils;
 import fi.dy.masa.malilib.util.StringUtils;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.WorldChunk;
 
 public class PortalDataStore
 {
@@ -172,7 +172,7 @@ public class PortalDataStore
         return false;
     }
 
-    public void updateFromSnapshots(String dimensionId, ChunkPos chunkPos, List<PortalSnapshot> snapshots, World world)
+    public void updateFromSnapshots(String dimensionId, ChunkPos chunkPos, List<PortalSnapshot> snapshots, Level world)
     {
         boolean changed = false;
         List<PortalEntry> matched = new ArrayList<>();
@@ -295,9 +295,9 @@ public class PortalDataStore
         }
     }
 
-    private boolean portalExistsInBounds(World world, PortalBounds bounds)
+    private boolean portalExistsInBounds(Level world, PortalBounds bounds)
     {
-        BlockPos.Mutable mutablePos = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
 
         for (int y = bounds.getMinY(); y <= bounds.getMaxY(); ++y)
         {
@@ -307,7 +307,7 @@ public class PortalDataStore
                 {
                     int chunkX = x >> 4;
                     int chunkZ = z >> 4;
-                    WorldChunk chunk = (WorldChunk) world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+                    LevelChunk chunk = (LevelChunk) world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 
                     if (chunk == null)
                     {
@@ -316,7 +316,7 @@ public class PortalDataStore
 
                     mutablePos.set(x, y, z);
 
-                    if (chunk.getBlockState(mutablePos).isOf(net.minecraft.block.Blocks.NETHER_PORTAL))
+                    if (chunk.getBlockState(mutablePos).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL))
                     {
                         return true;
                     }

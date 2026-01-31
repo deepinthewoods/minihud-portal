@@ -2,15 +2,15 @@ package ninja.trek.portal;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.border.WorldBorder;
 import org.jetbrains.annotations.Nullable;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
-import net.minecraft.world.border.WorldBorder;
 
 public final class PortalLinkPreview
 {
@@ -26,15 +26,15 @@ public final class PortalLinkPreview
     {
     }
 
-    public static @Nullable Preview compute(MinecraftClient mc)
+    public static @Nullable Preview compute(Minecraft mc)
     {
-        if (mc == null || mc.world == null || mc.player == null)
+        if (mc == null || mc.level == null || mc.player == null)
         {
             return null;
         }
 
-        World world = mc.world;
-        String currentDimensionId = world.getRegistryKey().getValue().toString();
+        Level world = mc.level;
+        String currentDimensionId = world.dimension().identifier().toString();
         LinkTarget linkTarget = resolveLinkTarget(currentDimensionId);
 
         if (linkTarget == null)
@@ -53,14 +53,14 @@ public final class PortalLinkPreview
         return new Preview(placementPreview.portalBounds, placementPreview.frameBlocks, linked);
     }
 
-    public static @Nullable PlacementPreview computePlacementPreview(MinecraftClient mc)
+    public static @Nullable PlacementPreview computePlacementPreview(Minecraft mc)
     {
-        if (mc == null || mc.world == null || mc.player == null)
+        if (mc == null || mc.level == null || mc.player == null)
         {
             return null;
         }
 
-        String currentDimensionId = mc.world.getRegistryKey().getValue().toString();
+        String currentDimensionId = mc.level.dimension().identifier().toString();
 
         if (resolveLinkTarget(currentDimensionId) == null)
         {
@@ -79,8 +79,8 @@ public final class PortalLinkPreview
 
     private static @Nullable LinkTarget resolveLinkTarget(String currentDimensionId)
     {
-        String overworldId = World.OVERWORLD.getValue().toString();
-        String netherId = World.NETHER.getValue().toString();
+        String overworldId = Level.OVERWORLD.identifier().toString();
+        String netherId = Level.NETHER.identifier().toString();
 
         if (currentDimensionId.equals(overworldId))
         {
@@ -95,7 +95,7 @@ public final class PortalLinkPreview
         return null;
     }
 
-    private static List<PortalEntry> findLinkedPortals(World world, String currentDimensionId,
+    private static List<PortalEntry> findLinkedPortals(Level world, String currentDimensionId,
                                                        LinkTarget linkTarget, PortalBounds destinationPortal)
     {
         List<PortalEntry> allPortals = PortalDataStore.getInstance().getPortals();
@@ -157,7 +157,7 @@ public final class PortalLinkPreview
     {
         int destX = borderInfo.clampX((worldX + 0.5D) * linkTarget.scale);
         int destZ = borderInfo.clampZ((worldZ + 0.5D) * linkTarget.scale);
-        int destY = MathHelper.floor(worldY + 0.5D);
+        int destY = Mth.floor(worldY + 0.5D);
         int radius = linkTarget.searchRadius;
 
         int bestIndex = -1;
@@ -201,21 +201,21 @@ public final class PortalLinkPreview
                bounds.getMaxZ() < destZ - radius || bounds.getMinZ() > destZ + radius;
     }
 
-    private static Placement computePlacement(PlayerEntity player)
+    private static Placement computePlacement(Player player)
     {
-        BlockPos basePos = BlockPos.ofFloored(player.getX(), player.getY(), player.getZ());
-        Direction facing = player.getHorizontalFacing();
-        Direction left = facing.rotateYCounterclockwise();
-        Direction right = facing.rotateYClockwise();
+        BlockPos basePos = BlockPos.containing(player.getX(), player.getY(), player.getZ());
+        Direction facing = player.getDirection();
+        Direction left = facing.getCounterClockWise();
+        Direction right = facing.getClockWise();
 
         double centerX = basePos.getX() + 0.5D;
         double centerZ = basePos.getZ() + 0.5D;
         double offsetX = player.getX() - centerX;
         double offsetZ = player.getZ() - centerZ;
-        double leftDot = offsetX * left.getOffsetX() + offsetZ * left.getOffsetZ();
+        double leftDot = offsetX * left.getStepX() + offsetZ * left.getStepZ();
         boolean leftSide = leftDot >= 0.0D;
 
-        BlockPos otherColumn = leftSide ? basePos.offset(left) : basePos.offset(right);
+        BlockPos otherColumn = leftSide ? basePos.relative(left) : basePos.relative(right);
         int minY = basePos.getY();
         int maxY = minY + 2;
         int minX;
@@ -291,18 +291,18 @@ public final class PortalLinkPreview
     {
         private BorderInfo(WorldBorder border)
         {
-            this(border.getBoundWest(), border.getBoundEast() - 1.0E-5D,
-                 border.getBoundNorth(), border.getBoundSouth() - 1.0E-5D);
+            this(border.getMinX(), border.getMaxX() - 1.0E-5D,
+                 border.getMinZ(), border.getMaxZ() - 1.0E-5D);
         }
 
         private int clampX(double x)
         {
-            return MathHelper.floor(MathHelper.clamp(x, this.west, this.east));
+            return Mth.floor(Mth.clamp(x, this.west, this.east));
         }
 
         private int clampZ(double z)
         {
-            return MathHelper.floor(MathHelper.clamp(z, this.north, this.south));
+            return Mth.floor(Mth.clamp(z, this.north, this.south));
         }
     }
 

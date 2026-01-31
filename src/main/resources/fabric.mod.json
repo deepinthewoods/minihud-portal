@@ -24,10 +24,10 @@
 	],
 	"depends": {
 		"fabricloader": ">=0.18.3",
-		"minecraft": "~1.21.10",
+		"minecraft": "~1.21.11",
 		"java": ">=21",
 		"fabric-api": "*",
-		"malilib": ">=0.26.3",
-		"minihud": ">=0.37.2"
+		"malilib": ">=0.27.0",
+		"minihud": ">=0.38.0"
 	}
 }

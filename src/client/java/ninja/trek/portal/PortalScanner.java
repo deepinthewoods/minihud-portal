@@ -3,19 +3,19 @@ package ninja.trek.portal;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.WorldChunk;
 
 public class PortalScanner
 {
@@ -53,26 +53,26 @@ public class PortalScanner
             return;
         }
 
-        MinecraftClient mc = MinecraftClient.getInstance();
-        World world = mc.world;
+        Minecraft mc = Minecraft.getInstance();
+        Level world = mc.level;
 
         if (world == null)
         {
             return;
         }
 
-        String dimensionId = world.getRegistryKey().getValue().toString();
+        String dimensionId = world.dimension().identifier().toString();
 
-        if (state.isOf(Blocks.NETHER_PORTAL) ||
+        if (state.is(Blocks.NETHER_PORTAL) ||
             PortalDataStore.getInstance().intersectsTrackedPortal(dimensionId, pos))
         {
             this.enqueueChunk(new ChunkPos(pos));
         }
     }
 
-    public void tick(MinecraftClient mc)
+    public void tick(Minecraft mc)
     {
-        if (mc.world == null || this.queue.isEmpty() || PortalDataStore.getInstance().getZoneSettings().isPortalScanningDisabled())
+        if (mc.level == null || this.queue.isEmpty() || PortalDataStore.getInstance().getZoneSettings().isPortalScanningDisabled())
         {
             return;
         }
@@ -82,7 +82,7 @@ public class PortalScanner
             long packed = this.queue.dequeueLong();
             this.queuedChunks.remove(packed);
             ChunkPos chunkPos = new ChunkPos(packed);
-            this.scanChunk(mc.world, chunkPos);
+            this.scanChunk(mc.level, chunkPos);
         }
     }
 
@@ -96,16 +96,16 @@ public class PortalScanner
         }
     }
 
-    private void scanChunk(World world, ChunkPos chunkPos)
+    private void scanChunk(Level world, ChunkPos chunkPos)
     {
         List<PortalSnapshot> snapshots = new ArrayList<>();
         LongOpenHashSet visited = new LongOpenHashSet();
-        BlockPos.Mutable mutablePos = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
 
-        int minY = world.getBottomY();
-        int maxY = world.getTopYInclusive();
-        int startX = chunkPos.getStartX();
-        int startZ = chunkPos.getStartZ();
+        int minY = world.getMinY();
+        int maxY = world.getMaxY();
+        int startX = chunkPos.getMinBlockX();
+        int startZ = chunkPos.getMinBlockZ();
 
         for (int y = minY; y <= maxY; y += 3)
         {
@@ -123,9 +123,9 @@ public class PortalScanner
 
                     BlockState state = this.getBlockStateIfLoaded(world, mutablePos);
 
-                    if (state != null && state.isOf(Blocks.NETHER_PORTAL))
+                    if (state != null && state.is(Blocks.NETHER_PORTAL))
                     {
-                        PortalSnapshot snapshot = this.explorePortal(world, mutablePos.toImmutable(), visited);
+                        PortalSnapshot snapshot = this.explorePortal(world, mutablePos.immutable(), visited);
 
                         if (snapshot != null)
                         {
@@ -136,11 +136,11 @@ public class PortalScanner
             }
         }
 
-        String dimensionId = world.getRegistryKey().getValue().toString();
+        String dimensionId = world.dimension().identifier().toString();
         PortalDataStore.getInstance().updateFromSnapshots(dimensionId, chunkPos, snapshots, world);
     }
 
-    private PortalSnapshot explorePortal(World world, BlockPos start, LongOpenHashSet visited)
+    private PortalSnapshot explorePortal(Level world, BlockPos start, LongOpenHashSet visited)
     {
         Deque<BlockPos> queue = new ArrayDeque<>();
         queue.add(start);
@@ -164,7 +164,7 @@ public class PortalScanner
             }
             BlockState state = this.getBlockStateIfLoaded(world, pos);
 
-            if (state == null || state.isOf(Blocks.NETHER_PORTAL) == false)
+            if (state == null || state.is(Blocks.NETHER_PORTAL) == false)
             {
                 continue;
             }
@@ -181,7 +181,7 @@ public class PortalScanner
 
             for (Direction dir : NEIGHBORS)
             {
-                BlockPos next = pos.offset(dir);
+                BlockPos next = pos.relative(dir);
                 queue.addLast(next);
             }
         }
@@ -194,11 +194,11 @@ public class PortalScanner
         return new PortalSnapshot(new PortalBounds(minX, minY, minZ, maxX, maxY, maxZ));
     }
 
-    private BlockState getBlockStateIfLoaded(World world, BlockPos pos)
+    private BlockState getBlockStateIfLoaded(Level world, BlockPos pos)
     {
         int chunkX = pos.getX() >> 4;
         int chunkZ = pos.getZ() >> 4;
-        WorldChunk chunk = (WorldChunk) world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+        LevelChunk chunk = (LevelChunk) world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 
         if (chunk == null)
         {

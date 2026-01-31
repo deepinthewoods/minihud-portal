@@ -5,10 +5,10 @@ import fi.dy.masa.malilib.gui.widgets.WidgetColorIndicator;
 import fi.dy.masa.malilib.gui.widgets.WidgetListEntryBase;
 import fi.dy.masa.malilib.render.RenderUtils;
 import fi.dy.masa.malilib.util.data.Color4f;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
+import fi.dy.masa.malilib.render.GuiContext;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import ninja.trek.portal.PortalDataStore;
 import ninja.trek.portal.PortalEntry;
 
@@ -43,7 +43,7 @@ public class WidgetPortalEntry extends WidgetListEntryBase<Object>
     }
 
     @Override
-    public boolean onMouseClicked(Click click, boolean mouseReleased)
+    public boolean onMouseClicked(MouseButtonEvent click, boolean mouseReleased)
     {
         boolean handled = this.aliasField.mouseClickedWrapper(click, mouseReleased);
 
@@ -62,7 +62,7 @@ public class WidgetPortalEntry extends WidgetListEntryBase<Object>
     }
 
     @Override
-    public boolean onKeyTyped(KeyInput key)
+    public boolean onKeyTyped(KeyEvent key)
     {
         if (this.aliasField.isFocusedWrapper() && this.aliasField.keyPressedWrapper(key))
         {
@@ -74,7 +74,7 @@ public class WidgetPortalEntry extends WidgetListEntryBase<Object>
     }
 
     @Override
-    public boolean onCharTyped(CharInput chr)
+    public boolean onCharTyped(CharacterEvent chr)
     {
         if (this.aliasField.isFocusedWrapper() && this.aliasField.charTypedWrapper(chr))
         {
@@ -86,7 +86,7 @@ public class WidgetPortalEntry extends WidgetListEntryBase<Object>
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, boolean selected)
+    public void render(GuiContext context, int mouseX, int mouseY, boolean selected)
     {
         if (selected || this.isMouseOver(mouseX, mouseY))
         {
@@ -113,7 +113,7 @@ public class WidgetPortalEntry extends WidgetListEntryBase<Object>
     }
 
     @Override
-    public boolean canSelectAt(Click click)
+    public boolean canSelectAt(MouseButtonEvent click)
     {
         return super.canSelectAt(click) && this.aliasField.isMouseOver((int) click.x(), (int) click.y()) == false;
     }

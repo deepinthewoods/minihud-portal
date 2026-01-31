@@ -38,3 +38,10 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
+
+# windows reserved device names
+
+nul
+NUL
+CON
+con

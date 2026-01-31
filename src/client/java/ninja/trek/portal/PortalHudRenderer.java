@@ -4,19 +4,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.BufferBuilderStorage;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.Frustum;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.profiler.Profiler;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.RenderBuffers;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import org.joml.Matrix4f;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import fi.dy.masa.malilib.config.HudAlignment;
 import fi.dy.masa.malilib.interfaces.IRenderer;
+import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
 import fi.dy.masa.minihud.config.Configs;
 import fi.dy.masa.minihud.data.DebugDataManager;
@@ -31,16 +31,18 @@ public class PortalHudRenderer implements IRenderer
     }
 
     @Override
-    public void onRenderGameOverlayPostAdvanced(DrawContext drawContext, float partialTicks, Profiler profiler, MinecraftClient mc)
+    public void onRenderGameOverlayPostAdvanced(GuiContext drawContext, float partialTicks, ProfilerFiller profiler)
     {
+        Minecraft mc = Minecraft.getInstance();
+
         if (Configs.Generic.MAIN_RENDERING_TOGGLE.getBooleanValue() == false ||
             DebugDataManager.getInstance().shouldShowDebugHudFix() ||
-            mc.player == null || mc.options.hudHidden)
+            mc.player == null || mc.options.hideGui)
         {
             return;
         }
 
-        if (Configs.Generic.REQUIRE_SNEAK.getBooleanValue() && mc.player.isSneaking() == false)
+        if (Configs.Generic.REQUIRE_SNEAK.getBooleanValue() && mc.player.isShiftKeyDown() == false)
         {
             return;
         }
@@ -83,19 +85,19 @@ public class PortalHudRenderer implements IRenderer
     }
 
     @Override
-    public void onRenderWorldPreWeather(Framebuffer fb, Matrix4f posMatrix, Matrix4f projMatrix, Frustum frustum,
-                                        Camera camera, BufferBuilderStorage buffers, Profiler profiler)
+    public void onRenderWorldPreWeather(RenderTarget fb, Matrix4f posMatrix, Matrix4f projMatrix, Frustum frustum,
+                                        Camera camera, RenderBuffers buffers, ProfilerFiller profiler)
     {
     }
 
     @Override
-    public void onRenderWorldLastAdvanced(Framebuffer fb, Matrix4f posMatrix, Matrix4f projMatrix, Frustum frustum,
-                                          Camera camera, BufferBuilderStorage buffers, Profiler profiler)
+    public void onRenderWorldLastAdvanced(RenderTarget fb, Matrix4f posMatrix, Matrix4f projMatrix, Frustum frustum,
+                                          Camera camera, RenderBuffers buffers, ProfilerFiller profiler)
     {
     }
 
     @Override
-    public void onRenderTooltipLast(DrawContext drawContext, ItemStack stack, int x, int y)
+    public void onRenderTooltipLast(GuiContext drawContext, ItemStack stack, int x, int y)
     {
     }
 
@@ -106,17 +108,17 @@ public class PortalHudRenderer implements IRenderer
     }
 
     @Override
-    public void onRenderTooltipComponentInsertFirst(Item.TooltipContext context, ItemStack stack, Consumer<Text> list)
+    public void onRenderTooltipComponentInsertFirst(Item.TooltipContext context, ItemStack stack, Consumer<Component> list)
     {
     }
 
     @Override
-    public void onRenderTooltipComponentInsertMiddle(Item.TooltipContext context, ItemStack stack, Consumer<Text> list)
+    public void onRenderTooltipComponentInsertMiddle(Item.TooltipContext context, ItemStack stack, Consumer<Component> list)
     {
     }
 
     @Override
-    public void onRenderTooltipComponentInsertLast(Item.TooltipContext context, ItemStack stack, Consumer<Text> list)
+    public void onRenderTooltipComponentInsertLast(Item.TooltipContext context, ItemStack stack, Consumer<Component> list)
     {
     }
 }

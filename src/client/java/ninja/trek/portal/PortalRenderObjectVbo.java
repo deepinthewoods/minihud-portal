@@ -1,9 +1,9 @@
 package ninja.trek.portal;
 
 import java.util.function.Supplier;
+import net.minecraft.world.phys.Vec3;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.VertexSorter;
-import net.minecraft.util.math.Vec3d;
+import com.mojang.blaze3d.vertex.VertexSorting;
 import fi.dy.masa.minihud.renderer.RenderObjectVbo;
 
 public class PortalRenderObjectVbo extends RenderObjectVbo
@@ -25,7 +25,7 @@ public class PortalRenderObjectVbo extends RenderObjectVbo
 
     public void lineWidthPublic(float width)
     {
-        super.lineWidth(width);
+        // Line width is now controlled by the RenderPipeline in 1.21.11+
     }
 
     public void drawPostPublic(boolean setLineWidth)
@@ -38,12 +38,12 @@ public class PortalRenderObjectVbo extends RenderObjectVbo
         return super.shouldResort();
     }
 
-    public void resortTranslucentPublic(VertexSorter sorter)
+    public void resortTranslucentPublic(VertexSorting sorter)
     {
         super.resortTranslucent(sorter);
     }
 
-    public VertexSorter createVertexSorterPublic(Vec3d pos)
+    public VertexSorting createVertexSorterPublic(Vec3 pos)
     {
         return super.createVertexSorter(pos);
     }

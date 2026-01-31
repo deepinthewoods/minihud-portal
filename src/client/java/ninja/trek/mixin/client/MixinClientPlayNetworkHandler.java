@@ -5,32 +5,32 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import fi.dy.masa.minihud.mixin.world.IMixinChunkDeltaUpdateS2CPacket;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDeltaUpdateS2CPacket;
-import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.core.SectionPos;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
 import ninja.trek.portal.PortalScanner;
 
-@Mixin(ClientPlayNetworkHandler.class)
+@Mixin(ClientPacketListener.class)
 public abstract class MixinClientPlayNetworkHandler
 {
-    @Inject(method = "onChunkData", at = @At("RETURN"))
-    private void minihudportal_onChunkData(ChunkDataS2CPacket packet, CallbackInfo ci)
+    @Inject(method = "handleLevelChunkWithLight", at = @At("RETURN"))
+    private void minihudportal_onChunkData(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci)
     {
-        PortalScanner.getInstance().onChunkLoaded(packet.getChunkX(), packet.getChunkZ());
+        PortalScanner.getInstance().onChunkLoaded(packet.getX(), packet.getZ());
     }
 
-    @Inject(method = "onBlockUpdate", at = @At("RETURN"))
-    private void minihudportal_onBlockUpdate(BlockUpdateS2CPacket packet, CallbackInfo ci)
+    @Inject(method = "handleBlockUpdate", at = @At("RETURN"))
+    private void minihudportal_onBlockUpdate(ClientboundBlockUpdatePacket packet, CallbackInfo ci)
     {
-        PortalScanner.getInstance().onBlockUpdate(packet.getPos(), packet.getState());
+        PortalScanner.getInstance().onBlockUpdate(packet.getPos(), packet.getBlockState());
     }
 
-    @Inject(method = "onChunkDeltaUpdate", at = @At("RETURN"))
-    private void minihudportal_onChunkDeltaUpdate(ChunkDeltaUpdateS2CPacket packet, CallbackInfo ci)
+    @Inject(method = "handleChunkBlocksUpdate", at = @At("RETURN"))
+    private void minihudportal_onChunkDeltaUpdate(ClientboundSectionBlocksUpdatePacket packet, CallbackInfo ci)
     {
-        ChunkSectionPos pos = ((IMixinChunkDeltaUpdateS2CPacket) packet).minihud_getChunkSectionPos();
-        PortalScanner.getInstance().onChunkLoaded(pos.getSectionX(), pos.getSectionZ());
+        SectionPos pos = ((IMixinChunkDeltaUpdateS2CPacket) packet).minihud_getChunkSectionPos();
+        PortalScanner.getInstance().onChunkLoaded(pos.x(), pos.z());
     }
 }

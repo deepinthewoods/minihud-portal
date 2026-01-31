@@ -1,7 +1,7 @@
 package ninja.trek.portal;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
 
 public final class PortalBounds
 {
@@ -64,8 +64,8 @@ public final class PortalBounds
 
     public boolean intersectsChunk(ChunkPos chunkPos)
     {
-        int chunkMinX = chunkPos.getStartX();
-        int chunkMinZ = chunkPos.getStartZ();
+        int chunkMinX = chunkPos.getMinBlockX();
+        int chunkMinZ = chunkPos.getMinBlockZ();
         int chunkMaxX = chunkMinX + 15;
         int chunkMaxZ = chunkMinZ + 15;
 
