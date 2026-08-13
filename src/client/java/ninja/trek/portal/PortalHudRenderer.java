@@ -49,21 +49,24 @@ public class PortalHudRenderer implements IRenderer
 
         PortalLinkPreview.Preview preview = PortalLinkPreview.compute(mc);
 
-        if (preview == null || preview.linkedPortals().isEmpty())
+        if (preview == null)
         {
             return;
         }
 
         List<String> lines = new ArrayList<>();
+        PortalEntry destination = preview.destinationPortal();
 
-        for (PortalEntry entry : preview.linkedPortals())
+        if (destination != null)
         {
-            lines.add(entry.getShortId());
+            String alias = destination.getAlias();
+            String label = alias.isBlank() ? destination.getShortId() :
+                    alias + " [" + destination.getShortId() + "]";
+            lines.add(Component.translatable("minihud-portal.hud.portal_destination", label).getString());
         }
-
-        if (lines.isEmpty())
+        else
         {
-            return;
+            lines.add(Component.translatable("minihud-portal.hud.portal_destination_new").getString());
         }
 
         int x = Configs.Generic.TEXT_POS_X.getIntegerValue();

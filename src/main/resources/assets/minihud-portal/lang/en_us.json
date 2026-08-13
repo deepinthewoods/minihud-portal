@@ -3,6 +3,8 @@
   "minihud-portal.gui.button.config_gui.portals": "Portals",
   "minihud-portal.gui.button.portal_zone_borders": "Show Portal Zone Borders: %s",
   "minihud-portal.gui.button.portal_zone_letters": "Show Portal Letters: %s",
-  "minihud-portal.gui.button.portal_simple_mode": "Simple Mode: %s",
-  "minihud-portal.gui.button.disable_portal_scanning": "Disable Portal Scanning: %s"
+  "minihud-portal.gui.button.portal_simple_mode": "Fast Approximate Boxes: %s",
+  "minihud-portal.gui.button.disable_portal_scanning": "Disable Portal Scanning: %s",
+  "minihud-portal.hud.portal_destination": "Portal here → %s",
+  "minihud-portal.hud.portal_destination_new": "Portal here → new portal (none in range)"
 }

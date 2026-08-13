@@ -5,10 +5,8 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.border.WorldBorder;
 import org.jetbrains.annotations.Nullable;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
@@ -18,7 +16,8 @@ public final class PortalLinkPreview
     {
     }
 
-    public record Preview(PortalBounds portalBounds, LongOpenHashSet frameBlocks, List<PortalEntry> linkedPortals)
+    public record Preview(PortalBounds portalBounds, LongOpenHashSet frameBlocks,
+                          @Nullable PortalEntry destinationPortal)
     {
     }
 
@@ -33,15 +32,6 @@ public final class PortalLinkPreview
             return null;
         }
 
-        Level world = mc.level;
-        String currentDimensionId = world.dimension().identifier().toString();
-        LinkTarget linkTarget = resolveLinkTarget(currentDimensionId);
-
-        if (linkTarget == null)
-        {
-            return null;
-        }
-
         PlacementPreview placementPreview = computePlacementPreview(mc);
 
         if (placementPreview == null)
@@ -49,8 +39,47 @@ public final class PortalLinkPreview
             return null;
         }
 
-        List<PortalEntry> linked = findLinkedPortals(world, currentDimensionId, linkTarget, placementPreview.portalBounds);
-        return new Preview(placementPreview.portalBounds, placementPreview.frameBlocks, linked);
+        PortalEntry destination = findDestinationPortal(mc);
+        return new Preview(placementPreview.portalBounds, placementPreview.frameBlocks, destination);
+    }
+
+    /**
+     * Returns the existing portal Minecraft would choose for an entity entering
+     * the hypothetical portal at the player's exact current position.
+     */
+    public static @Nullable PortalEntry findDestinationPortal(Minecraft mc)
+    {
+        if (mc == null || mc.level == null || mc.player == null)
+        {
+            return null;
+        }
+
+        Level world = mc.level;
+        String currentDimensionId = world.dimension().identifier().toString();
+        PortalLinking.TargetDimension target = PortalLinking.resolveTarget(currentDimensionId);
+
+        if (target == null)
+        {
+            return null;
+        }
+
+        List<PortalEntry> candidates = new ArrayList<>();
+        List<PortalBounds> candidateBounds = new ArrayList<>();
+
+        for (PortalEntry entry : PortalDataStore.getInstance().getPortals())
+        {
+            if (entry.getDimensionId().equals(target.dimensionId()))
+            {
+                candidates.add(entry);
+                candidateBounds.add(entry.getBounds());
+            }
+        }
+
+        int portalIndex = PortalLinking.findClosestPortalIndex(
+                mc.player.getX(), mc.player.getY(), mc.player.getZ(),
+                target, world.getWorldBorder(), candidateBounds);
+
+        return portalIndex != PortalLinking.NO_PORTAL ? candidates.get(portalIndex) : null;
     }
 
     public static @Nullable PlacementPreview computePlacementPreview(Minecraft mc)
@@ -62,7 +91,7 @@ public final class PortalLinkPreview
 
         String currentDimensionId = mc.level.dimension().identifier().toString();
 
-        if (resolveLinkTarget(currentDimensionId) == null)
+        if (PortalLinking.resolveTarget(currentDimensionId) == null)
         {
             return null;
         }
@@ -75,130 +104,6 @@ public final class PortalLinkPreview
         }
 
         return new PlacementPreview(placement.portalBounds, placement.frameBlocks);
-    }
-
-    private static @Nullable LinkTarget resolveLinkTarget(String currentDimensionId)
-    {
-        String overworldId = Level.OVERWORLD.identifier().toString();
-        String netherId = Level.NETHER.identifier().toString();
-
-        if (currentDimensionId.equals(overworldId))
-        {
-            return new LinkTarget(netherId, 8.0D, 128);
-        }
-
-        if (currentDimensionId.equals(netherId))
-        {
-            return new LinkTarget(overworldId, 1.0D / 8.0D, 16);
-        }
-
-        return null;
-    }
-
-    private static List<PortalEntry> findLinkedPortals(Level world, String currentDimensionId,
-                                                       LinkTarget linkTarget, PortalBounds destinationPortal)
-    {
-        List<PortalEntry> allPortals = PortalDataStore.getInstance().getPortals();
-        List<PortalBounds> targetCandidates = new ArrayList<>();
-        targetCandidates.add(destinationPortal);
-
-        for (PortalEntry entry : allPortals)
-        {
-            if (entry.getDimensionId().equals(currentDimensionId))
-            {
-                targetCandidates.add(entry.getBounds());
-            }
-        }
-
-        WorldBorder border = world.getWorldBorder();
-        BorderInfo borderInfo = new BorderInfo(border);
-        List<PortalEntry> linked = new ArrayList<>();
-
-        for (PortalEntry entry : allPortals)
-        {
-            if (entry.getDimensionId().equals(linkTarget.sourceDimensionId) == false)
-            {
-                continue;
-            }
-
-            if (linksToDestination(entry.getBounds(), targetCandidates, linkTarget, borderInfo))
-            {
-                linked.add(entry);
-            }
-        }
-
-        return linked;
-    }
-
-    private static boolean linksToDestination(PortalBounds sourceBounds, List<PortalBounds> targetCandidates,
-                                              LinkTarget linkTarget, BorderInfo borderInfo)
-    {
-        for (int y = sourceBounds.getMinY(); y <= sourceBounds.getMaxY(); ++y)
-        {
-            for (int z = sourceBounds.getMinZ(); z <= sourceBounds.getMaxZ(); ++z)
-            {
-                for (int x = sourceBounds.getMinX(); x <= sourceBounds.getMaxX(); ++x)
-                {
-                    int bestIndex = resolvePortalIndex(x, y, z, linkTarget, borderInfo, targetCandidates);
-
-                    if (bestIndex == 0)
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static int resolvePortalIndex(int worldX, int worldY, int worldZ, LinkTarget linkTarget,
-                                          BorderInfo borderInfo, List<PortalBounds> targetCandidates)
-    {
-        int destX = borderInfo.clampX((worldX + 0.5D) * linkTarget.scale);
-        int destZ = borderInfo.clampZ((worldZ + 0.5D) * linkTarget.scale);
-        int destY = Mth.floor(worldY + 0.5D);
-        int radius = linkTarget.searchRadius;
-
-        int bestIndex = -1;
-        double bestDist = Double.POSITIVE_INFINITY;
-
-        for (int candidateIndex = 0; candidateIndex < targetCandidates.size(); ++candidateIndex)
-        {
-            PortalBounds bounds = targetCandidates.get(candidateIndex);
-
-            if (isOutsideSearchSquare(bounds, destX, destZ, radius))
-            {
-                continue;
-            }
-
-            int portalMinY = bounds.getMinY();
-
-            for (int portalX = bounds.getMinX(); portalX <= bounds.getMaxX(); ++portalX)
-            {
-                for (int portalZ = bounds.getMinZ(); portalZ <= bounds.getMaxZ(); ++portalZ)
-                {
-                    double dx = portalX - destX;
-                    double dy = portalMinY - destY;
-                    double dz = portalZ - destZ;
-                    double distSq = dx * dx + dy * dy + dz * dz;
-
-                    if (distSq < bestDist)
-                    {
-                        bestDist = distSq;
-                        bestIndex = candidateIndex;
-                    }
-                }
-            }
-        }
-
-        return bestIndex;
-    }
-
-    private static boolean isOutsideSearchSquare(PortalBounds bounds, int destX, int destZ, int radius)
-    {
-        return bounds.getMaxX() < destX - radius || bounds.getMinX() > destX + radius ||
-               bounds.getMaxZ() < destZ - radius || bounds.getMinZ() > destZ + radius;
     }
 
     private static Placement computePlacement(Player player)
@@ -285,29 +190,6 @@ public final class PortalLinkPreview
         }
 
         return frameBlocks;
-    }
-
-    private record BorderInfo(double west, double east, double north, double south)
-    {
-        private BorderInfo(WorldBorder border)
-        {
-            this(border.getMinX(), border.getMaxX() - 1.0E-5D,
-                 border.getMinZ(), border.getMaxZ() - 1.0E-5D);
-        }
-
-        private int clampX(double x)
-        {
-            return Mth.floor(Mth.clamp(x, this.west, this.east));
-        }
-
-        private int clampZ(double z)
-        {
-            return Mth.floor(Mth.clamp(z, this.north, this.south));
-        }
-    }
-
-    private record LinkTarget(String sourceDimensionId, double scale, int searchRadius)
-    {
     }
 
     private record Placement(PortalBounds portalBounds, LongOpenHashSet frameBlocks)

@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
@@ -38,7 +37,9 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     private static final int MAX_GROUPS_PER_TICK = 1;
     private static final short NO_PORTAL = -1;
     private static final float LETTER_STROKE_PIXELS = 2.5f;
+    private static final float HIGHLIGHT_STROKE_PIXELS = 7.5f;
     private static final float LETTER_STROKE_RELATIVE_FALLBACK = 0.12f;
+    private static final int HIGHLIGHT_COLOR = 0xFFFF55;
 
     private final List<PortalWorkGroup> pendingGroups = new ArrayList<>();
     private final Int2ObjectOpenHashMap<LongOpenHashSet> positionsByPortal = new Int2ObjectOpenHashMap<>();
@@ -82,7 +83,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         boolean showZoneBorders = settings.isShowZoneBorders();
         boolean renderLetters = settings.shouldRenderLetters();
         boolean hasWorld = mc.level != null;
-        TargetDimension target = hasWorld ? this.resolveTarget(mc.level) : null;
+        PortalLinking.TargetDimension target = hasWorld ? this.resolveTarget(mc.level) : null;
         boolean shouldRender = (showZoneBorders || renderLetters) && hasWorld && target != null;
 
         if (this.pendingToggleDiagnostics)
@@ -93,7 +94,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                     showZoneBorders,
                     renderLetters,
                     hasWorld,
-                    target != null ? target.dimensionId : "<none>");
+                    target != null ? target.dimensionId() : "<none>");
         }
 
         return shouldRender;
@@ -180,7 +181,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
 
         Level world = mc.level;
-        TargetDimension target = this.resolveTarget(world);
+        PortalLinking.TargetDimension target = this.resolveTarget(world);
 
         if (target == null)
         {
@@ -315,7 +316,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         this.pendingToggleDiagnostics = showZoneBorders;
     }
 
-    private void rebuild(Level world, TargetDimension target)
+    private void rebuild(Level world, PortalLinking.TargetDimension target)
     {
         this.clearPositions();
         this.searchContext = this.buildSearchContext(world, target);
@@ -333,7 +334,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         this.nextGroupIndex = 0;
     }
 
-    private void processGroups(TargetDimension target)
+    private void processGroups(PortalLinking.TargetDimension target)
     {
         if (this.searchContext == null || this.searchContext.portals.isEmpty())
         {
@@ -456,7 +457,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
     }
 
-    private void processGroup(PortalWorkGroup group, TargetDimension target, PortalSearchContext context)
+    private void processGroup(PortalWorkGroup group, PortalLinking.TargetDimension target, PortalSearchContext context)
     {
         boolean simpleMode = PortalDataStore.getInstance().getZoneSettings().isSimpleMode();
 
@@ -481,7 +482,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     }
 
     private void processIsolatedPortal(int portalIndex, PortalCandidate portal, PortalInfluence influence,
-                                       TargetDimension target, PortalSearchContext context)
+                                       PortalLinking.TargetDimension target, PortalSearchContext context)
     {
         int minY = influence.minY();
         int maxY = influence.maxY();
@@ -537,7 +538,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
     }
 
-    private void processOverlapGroup(PortalWorkGroup group, TargetDimension target, PortalSearchContext context)
+    private void processOverlapGroup(PortalWorkGroup group, PortalLinking.TargetDimension target, PortalSearchContext context)
     {
         PortalInfluence bounds = group.bounds;
         int minY = bounds.minY();
@@ -573,21 +574,9 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
     }
 
-    private boolean isBoundaryForPortal(int worldX, int worldY, int worldZ, PortalCandidate portal,
-                                        TargetDimension target, PortalSearchContext context)
-    {
-        // A position is on the boundary if it has at least one neighbor outside the influence
-        // This creates a complete perimeter border around the zone
-        return this.isWithinInfluence(worldX + 1, worldY, worldZ, portal, target, context) == false ||
-               this.isWithinInfluence(worldX - 1, worldY, worldZ, portal, target, context) == false ||
-               this.isWithinInfluence(worldX, worldY + 1, worldZ, portal, target, context) == false ||
-               this.isWithinInfluence(worldX, worldY - 1, worldZ, portal, target, context) == false ||
-               this.isWithinInfluence(worldX, worldY, worldZ + 1, portal, target, context) == false ||
-               this.isWithinInfluence(worldX, worldY, worldZ - 1, portal, target, context) == false;
-    }
-
     private boolean isBoundaryInGroup(int worldX, int worldY, int worldZ, short currentZone,
-                                      TargetDimension target, PortalSearchContext context, int[] portalIndices)
+                                      PortalLinking.TargetDimension target, PortalSearchContext context,
+                                      int[] portalIndices)
     {
         // A position is on the boundary of currentZone if it has at least one neighbor
         // that is NOT part of currentZone (could be another zone or no zone)
@@ -600,27 +589,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                this.resolvePortalIndex(worldX, worldY, worldZ - 1, target, context, portalIndices) != currentZone;
     }
 
-    private boolean isWithinInfluence(int worldX, int worldY, int worldZ, PortalCandidate portal,
-                                      TargetDimension target, PortalSearchContext context)
-    {
-        if (worldY < context.world.getMinY() || worldY > context.world.getMaxY())
-        {
-            return false;
-        }
-
-        int destX = context.clampX((worldX + 0.5D) * target.scale);
-        int destZ = context.clampZ((worldZ + 0.5D) * target.scale);
-        int radius = target.searchRadius;
-
-        if (portal.isOutsideSearchSquare(destX, destZ, radius))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private short resolvePortalIndex(int worldX, int worldY, int worldZ, TargetDimension target,
+    private short resolvePortalIndex(int worldX, int worldY, int worldZ,
+                                     PortalLinking.TargetDimension target,
                                      PortalSearchContext context, int[] portalIndices)
     {
         if (worldY < context.world.getMinY() || worldY > context.world.getMaxY())
@@ -628,62 +598,23 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             return NO_PORTAL;
         }
 
-        int destX = context.clampX((worldX + 0.5D) * target.scale);
-        int destZ = context.clampZ((worldZ + 0.5D) * target.scale);
-        int destY = Mth.floor(worldY + 0.5D);
-        int radius = target.searchRadius;
-
-        int bestIndex = -1;
-        double bestDist = Double.POSITIVE_INFINITY;
-
-        for (int portalIndex : portalIndices)
-        {
-            PortalCandidate portal = context.portals.get(portalIndex);
-
-            if (portal.isOutsideSearchSquare(destX, destZ, radius))
-            {
-                continue;
-            }
-
-            PortalBounds bounds = portal.bounds();
-            int portalMinY = bounds.getMinY();
-
-            // Check every portal block in the XZ plane (only bottom of each column matters per algorithm.txt)
-            for (int portalX = bounds.getMinX(); portalX <= bounds.getMaxX(); ++portalX)
-            {
-                for (int portalZ = bounds.getMinZ(); portalZ <= bounds.getMaxZ(); ++portalZ)
-                {
-                    double dx = portalX - destX;
-                    double dy = portalMinY - destY;
-                    double dz = portalZ - destZ;
-                    double distSq = dx * dx + dy * dy + dz * dz;
-
-                    if (distSq < bestDist)
-                    {
-                        bestDist = distSq;
-                        bestIndex = portalIndex;
-                    }
-                }
-            }
-        }
-
-        return bestIndex == -1 ? NO_PORTAL : (short) bestIndex;
+        int portalIndex = PortalLinking.findClosestPortalIndex(
+                worldX + 0.5D, worldY + 0.5D, worldZ + 0.5D,
+                target, context.border, context.portalBounds, portalIndices);
+        return portalIndex == PortalLinking.NO_PORTAL ? NO_PORTAL : (short) portalIndex;
     }
 
-    private PortalSearchContext buildSearchContext(Level world, TargetDimension target)
+    private PortalSearchContext buildSearchContext(Level world, PortalLinking.TargetDimension target)
     {
         PortalSearchContext context = new PortalSearchContext(world);
         context.border = world.getWorldBorder();
-        context.borderWest = context.border.getMinX();
-        context.borderEast = context.border.getMaxX() - 1.0E-5D;
-        context.borderNorth = context.border.getMinZ();
-        context.borderSouth = context.border.getMaxZ() - 1.0E-5D;
 
         List<PortalCandidate> portals = new ArrayList<>();
+        List<PortalBounds> portalBounds = new ArrayList<>();
 
         for (PortalEntry entry : PortalDataStore.getInstance().getPortals())
         {
-            if (entry.getDimensionId().equals(target.dimensionId) == false)
+            if (entry.getDimensionId().equals(target.dimensionId()) == false)
             {
                 continue;
             }
@@ -691,14 +622,17 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             PortalBounds bounds = entry.getBounds();
 
             portals.add(new PortalCandidate(bounds, entry.getColor(), entry.getDimensionId()));
+            portalBounds.add(bounds);
         }
 
         context.portals = portals;
+        context.portalBounds = portalBounds;
         context.influences = this.buildInfluences(context, target);
         return context;
     }
 
-    private List<PortalInfluence> buildInfluences(PortalSearchContext context, TargetDimension target)
+    private List<PortalInfluence> buildInfluences(PortalSearchContext context,
+                                                  PortalLinking.TargetDimension target)
     {
         if (context.portals.isEmpty())
         {
@@ -712,14 +646,14 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         for (PortalCandidate portal : context.portals)
         {
             PortalBounds bounds = portal.bounds();
-            double minDestX = bounds.getMinX() - target.searchRadius;
-            double maxDestX = bounds.getMaxX() + target.searchRadius;
-            double minDestZ = bounds.getMinZ() - target.searchRadius;
-            double maxDestZ = bounds.getMaxZ() + target.searchRadius;
-            int minSourceX = this.toSourceMin(minDestX, target.scale);
-            int maxSourceX = this.toSourceMax(maxDestX, target.scale);
-            int minSourceZ = this.toSourceMin(minDestZ, target.scale);
-            int maxSourceZ = this.toSourceMax(maxDestZ, target.scale);
+            double minDestX = bounds.getMinX() - target.searchRadius();
+            double maxDestX = bounds.getMaxX() + target.searchRadius();
+            double minDestZ = bounds.getMinZ() - target.searchRadius();
+            double maxDestZ = bounds.getMaxZ() + target.searchRadius();
+            int minSourceX = this.toSourceMin(minDestX, target.scale());
+            int maxSourceX = this.toSourceMax(maxDestX, target.scale());
+            int minSourceZ = this.toSourceMin(minDestZ, target.scale());
+            int maxSourceZ = this.toSourceMax(maxDestZ, target.scale());
 
             int minX = Math.min(minSourceX, maxSourceX);
             int maxX = Math.max(minSourceX, maxSourceX);
@@ -804,7 +738,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
 
         Level world = mc.level;
-        TargetDimension target = this.resolveTarget(world);
+        PortalLinking.TargetDimension target = this.resolveTarget(world);
         if (target == null || this.searchContext == null)
         {
             return;
@@ -813,6 +747,9 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         PortalZoneSettings settings = PortalDataStore.getInstance().getZoneSettings();
         boolean showZoneBorders = settings.isShowZoneBorders();
         boolean renderLetters = settings.shouldRenderLetters();
+        int highlightedPortalIndex = PortalLinking.findClosestPortalIndex(
+                mc.player.getX(), mc.player.getY(), mc.player.getZ(),
+                target, this.searchContext.border, this.searchContext.portalBounds);
 
         double maxRange = mc.options.renderDistance().get() * 16.0D * 2.0D;
         double maxRangeSq = maxRange * maxRange;
@@ -845,7 +782,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                 PortalCandidate portal = this.searchContext.portals.get(cache.portalIndex);
                 if (portal != null)
                 {
-                    this.buildPortalLetters(cache, cameraPos, portal, target.scale);
+                    this.buildPortalLetters(cache, cameraPos, portal, target.scale(),
+                                            cache.portalIndex == highlightedPortalIndex);
                 }
             }
         }
@@ -940,7 +878,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         cache.outlinesDirty = false;
     }
 
-    private void buildPortalLetters(PortalRenderCache cache, Vec3d cameraPos, PortalCandidate portal, double scale)
+    private void buildPortalLetters(PortalRenderCache cache, Vec3d cameraPos, PortalCandidate portal,
+                                    double scale, boolean highlighted)
     {
         if (cache.lettersDirty == false && cache.letters.isUploadedPublic())
         {
@@ -948,13 +887,13 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         }
 
         this.buildPortalLetters(cache.letters, cameraPos, portal.bounds(), cache.color, portal.dimensionId(),
-                                scale, Integer.toString(cache.portalIndex));
+                                scale, Integer.toString(cache.portalIndex), highlighted);
 
         cache.lettersDirty = false;
     }
 
     private void buildPortalLetters(PortalRenderObjectVbo letters, Vec3d cameraPos, PortalBounds bounds, int color,
-                                    String portalDimensionId, double scale, String cacheKey)
+                                    String portalDimensionId, double scale, String cacheKey, boolean highlighted)
     {
         BufferBuilder builder = letters.start(
                 () -> "minihud-portal:portal_zones/letters/" + cacheKey,
@@ -986,10 +925,12 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
                    letterChar, cacheKey, translatedCenterX, centerY, translatedCenterZ,
                    letterWidth, letterHeight, portalDimensionId);
 
-        Color4f letterColor = Color4f.fromColor(color, 1.0f);
         Vec3 viewDir = this.getCameraViewDirection();
+        Color4f letterColor = Color4f.fromColor(highlighted ? HIGHLIGHT_COLOR : color, 1.0f);
+        float strokePixels = highlighted ? HIGHLIGHT_STROKE_PIXELS : LETTER_STROKE_PIXELS;
         this.drawBillboardedLetter(builder, translatedCenterX, centerY, translatedCenterZ,
-                                   letterWidth, letterHeight, letterChar, letterColor, cameraPos, viewDir);
+                                   letterWidth, letterHeight, letterChar, letterColor,
+                                   cameraPos, viewDir, strokePixels);
 
         try
         {
@@ -1014,7 +955,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
     private void drawBillboardedLetter(BufferBuilder builder, double worldX, double worldY, double worldZ,
                                        double width, double height, char letter, Color4f color,
-                                       Vec3d cameraPos, Vec3 viewDir)
+                                       Vec3d cameraPos, Vec3 viewDir, float strokePixels)
     {
         // Camera-relative position
         float cx = (float) (worldX - cameraPos.x);
@@ -1022,7 +963,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         float cz = (float) (worldZ - cameraPos.z);
         float halfWidth = (float) (width / 2.0);
         float halfHeight = (float) (height / 2.0);
-        float stroke = this.computeLetterStroke(worldX, worldY, worldZ, halfWidth, halfHeight, cameraPos);
+        float stroke = this.computeLetterStroke(
+                worldX, worldY, worldZ, halfWidth, halfHeight, cameraPos, strokePixels);
 
         // For proper billboarding, we need to construct a coordinate system
         // where the letter faces the camera.
@@ -1177,7 +1119,8 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
     }
 
     private float computeLetterStroke(double worldX, double worldY, double worldZ,
-                                      float halfWidth, float halfHeight, Vec3d cameraPos)
+                                      float halfWidth, float halfHeight, Vec3d cameraPos,
+                                      float strokePixels)
     {
         if (halfWidth <= 0.0f || halfHeight <= 0.0f)
         {
@@ -1208,7 +1151,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
         double fovDegrees = mc.options.fov().get();
         double fovRadians = Math.toRadians(fovDegrees);
         double worldPerPixel = 2.0 * distance * Math.tan(fovRadians / 2.0) / framebufferHeight;
-        float stroke = (float) (LETTER_STROKE_PIXELS * worldPerPixel);
+        float stroke = (float) (strokePixels * worldPerPixel);
         return Math.min(stroke, Math.min(halfWidth, halfHeight));
     }
 
@@ -1472,55 +1415,29 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
             PortalEntry portal = cache.portal;
             this.buildPortalLetters(cache.letters, cameraPos, portal.getBounds(), cache.color,
-                                    portal.getDimensionId(), 1.0D, cache.key);
+                                    portal.getDimensionId(), 1.0D, cache.key, false);
             cache.lettersDirty = false;
         }
     }
 
     @Nullable
-    private TargetDimension resolveTarget(Level world)
+    private PortalLinking.TargetDimension resolveTarget(Level world)
     {
-        String dimensionId = world.dimension().identifier().toString();
-
-        if (dimensionId.equals(Level.NETHER.identifier().toString()))
-        {
-            return new TargetDimension(Level.OVERWORLD.identifier().toString(), 8.0D, 128);
-        }
-
-        if (dimensionId.equals(Level.OVERWORLD.identifier().toString()))
-        {
-            return new TargetDimension(Level.NETHER.identifier().toString(), 1.0D / 8.0D, 16);
-        }
-
-        return null;
+        return PortalLinking.resolveTarget(world.dimension().identifier().toString());
     }
 
     private static class PortalSearchContext
     {
         private final Level world;
         private WorldBorder border;
-        private double borderWest;
-        private double borderEast;
-        private double borderNorth;
-        private double borderSouth;
         private List<PortalCandidate> portals = List.of();
+        private List<PortalBounds> portalBounds = List.of();
         private List<PortalInfluence> influences = List.of();
 
         private PortalSearchContext(Level world)
         {
             this.world = world;
         }
-
-        private int clampX(double x)
-        {
-            return Mth.floor(Mth.clamp(x, this.borderWest, this.borderEast));
-        }
-
-        private int clampZ(double z)
-        {
-            return Mth.floor(Mth.clamp(z, this.borderNorth, this.borderSouth));
-        }
-
     }
 
     private static class PortalRenderCache
@@ -1641,18 +1558,6 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
     private record PortalCandidate(PortalBounds bounds, int color, String dimensionId)
     {
-        private int minX() { return this.bounds.getMinX(); }
-        private int minY() { return this.bounds.getMinY(); }
-        private int minZ() { return this.bounds.getMinZ(); }
-        private int maxX() { return this.bounds.getMaxX(); }
-        private int maxY() { return this.bounds.getMaxY(); }
-        private int maxZ() { return this.bounds.getMaxZ(); }
-
-        private boolean isOutsideSearchSquare(int destX, int destZ, int radius)
-        {
-            return this.maxX() < destX - radius || this.minX() > destX + radius ||
-                   this.maxZ() < destZ - radius || this.minZ() > destZ + radius;
-        }
     }
 
     private record PortalInfluence(int minX, int maxX, int minY, int maxY, int minZ, int maxZ)
@@ -1695,9 +1600,5 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
             this.portalIndices = portalIndices;
             this.bounds = bounds;
         }
-    }
-
-    private record TargetDimension(String dimensionId, double scale, int searchRadius)
-    {
     }
 }
