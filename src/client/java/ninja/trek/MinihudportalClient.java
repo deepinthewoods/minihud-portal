@@ -20,7 +20,7 @@ public class MinihudportalClient implements ClientModInitializer {
 
 		RenderContainer.INSTANCE.addRenderer(PortalZoneRenderer.INSTANCE);
 		RenderContainer.INSTANCE.addRenderer(PortalGhostRenderer.INSTANCE);
-		RenderEventHandler.getInstance().registerGameOverlayRenderer(PortalHudRenderer.getInstance());
+		RenderEventHandler.getInstance().registerInGameGuiRenderer(PortalHudRenderer.getInstance());
 
 		ClientTickEvents.END_CLIENT_TICK.register(PortalScanner.getInstance()::tick);
 	}

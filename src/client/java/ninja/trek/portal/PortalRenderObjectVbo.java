@@ -10,7 +10,7 @@ public class PortalRenderObjectVbo extends RenderObjectVbo
 {
     public PortalRenderObjectVbo(Supplier<String> name, RenderPipeline shader)
     {
-        super(name, shader);
+        super(name, shader, 0);
     }
 
     public boolean isStartedPublic()

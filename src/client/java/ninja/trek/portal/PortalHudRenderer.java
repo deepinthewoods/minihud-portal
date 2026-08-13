@@ -4,16 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderBuffers;
-import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import org.joml.Matrix4f;
-import com.mojang.blaze3d.pipeline.RenderTarget;
 import fi.dy.masa.malilib.config.HudAlignment;
 import fi.dy.masa.malilib.interfaces.IRenderer;
 import fi.dy.masa.malilib.render.GuiContext;
@@ -31,13 +26,13 @@ public class PortalHudRenderer implements IRenderer
     }
 
     @Override
-    public void onRenderGameOverlayPostAdvanced(GuiContext drawContext, float partialTicks, ProfilerFiller profiler)
+    public void onExtractGuiOverlayPost(GuiContext drawContext, float partialTicks, ProfilerFiller profiler)
     {
         Minecraft mc = Minecraft.getInstance();
 
         if (Configs.Generic.MAIN_RENDERING_TOGGLE.getBooleanValue() == false ||
             DebugDataManager.getInstance().shouldShowDebugHudFix() ||
-            mc.player == null || mc.options.hideGui)
+            mc.player == null || mc.gui.hud.isHidden())
         {
             return;
         }
@@ -82,18 +77,6 @@ public class PortalHudRenderer implements IRenderer
                                textColor, bgColor, HudAlignment.BOTTOM_RIGHT,
                                useBackground, useShadow, Configs.Generic.HUD_STATUS_EFFECTS_SHIFT.getBooleanValue(),
                                lines);
-    }
-
-    @Override
-    public void onRenderWorldPreWeather(RenderTarget fb, Matrix4f posMatrix, Matrix4f projMatrix, Frustum frustum,
-                                        Camera camera, RenderBuffers buffers, ProfilerFiller profiler)
-    {
-    }
-
-    @Override
-    public void onRenderWorldLastAdvanced(RenderTarget fb, Matrix4f posMatrix, Matrix4f projMatrix, Frustum frustum,
-                                          Camera camera, RenderBuffers buffers, ProfilerFiller profiler)
-    {
     }
 
     @Override

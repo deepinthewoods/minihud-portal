@@ -5,12 +5,12 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.Vec3;
+import fi.dy.masa.malilib.util.position.Vec3d;
 import fi.dy.masa.malilib.render.MaLiLibPipelines;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.MeshData;
 import fi.dy.masa.malilib.interfaces.IRangeChangeListener;
-import fi.dy.masa.malilib.util.LayerRange;
+import fi.dy.masa.malilib.util.position.LayerRange;
 import fi.dy.masa.malilib.util.data.Color4f;
 import fi.dy.masa.minihud.renderer.OverlayRendererBase;
 import fi.dy.masa.minihud.renderer.RenderUtils;
@@ -54,7 +54,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
     }
 
     @Override
-    public void update(Vec3 cameraPos, Entity entity, Minecraft mc, ProfilerFiller profiler)
+    public void update(Vec3d cameraPos, Entity entity, Minecraft mc, ProfilerFiller profiler)
     {
         PortalLinkPreview.PlacementPreview preview = PortalLinkPreview.computePlacementPreview(mc);
 
@@ -78,7 +78,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
     }
 
     @Override
-    public void render(Vec3 cameraPos, Minecraft mc, ProfilerFiller profiler)
+    public void render(Vec3d cameraPos, Minecraft mc, ProfilerFiller profiler)
     {
         if (this.dirty)
         {
@@ -87,7 +87,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
     }
 
     @Override
-    public void draw(Vec3 cameraPos)
+    public void draw(Vec3d cameraPos)
     {
         if (this.hasData == false)
         {
@@ -142,7 +142,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
         this.dirty = true;
     }
 
-    private void buildFrameQuads(Vec3 cameraPos)
+    private void buildFrameQuads(Vec3d cameraPos)
     {
         if (this.frameBlocks.isEmpty())
         {
@@ -153,7 +153,8 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
 
         BufferBuilder builder = this.frameQuads.start(
                 () -> "minihud-portal:portal_preview/frame",
-                MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL);
+                MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL,
+                0);
         Color4f color = Color4f.fromColor(FRAME_COLOR, FRAME_ALPHA);
 
         RenderUtils.renderBlockPositions(this.frameBlocks, this.layerRange, color, 0.0D, cameraPos, builder);
@@ -174,7 +175,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
         }
     }
 
-    private void drawRenderObject(PortalRenderObjectVbo obj, Vec3 cameraPos)
+    private void drawRenderObject(PortalRenderObjectVbo obj, Vec3d cameraPos)
     {
         if (obj == null || obj.isStartedPublic() == false || obj.isUploadedPublic() == false)
         {
@@ -183,7 +184,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
 
         if (this.shouldResort && obj.shouldResortPublic())
         {
-            obj.resortTranslucentPublic(obj.createVertexSorterPublic(cameraPos));
+            obj.resortTranslucentPublic(obj.createVertexSorterPublic(cameraPos.toVanilla()));
         }
 
         obj.drawPostPublic(false);

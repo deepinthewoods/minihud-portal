@@ -4,9 +4,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import fi.dy.masa.minihud.mixin.world.IMixinChunkDeltaUpdateS2CPacket;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.core.SectionPos;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
@@ -30,7 +28,6 @@ public abstract class MixinClientPlayNetworkHandler
     @Inject(method = "handleChunkBlocksUpdate", at = @At("RETURN"))
     private void minihudportal_onChunkDeltaUpdate(ClientboundSectionBlocksUpdatePacket packet, CallbackInfo ci)
     {
-        SectionPos pos = ((IMixinChunkDeltaUpdateS2CPacket) packet).minihud_getChunkSectionPos();
-        PortalScanner.getInstance().onChunkLoaded(pos.x(), pos.z());
+        packet.runUpdates(PortalScanner.getInstance()::onBlockUpdate);
     }
 }

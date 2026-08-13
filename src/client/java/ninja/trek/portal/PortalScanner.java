@@ -66,7 +66,7 @@ public class PortalScanner
         if (state.is(Blocks.NETHER_PORTAL) ||
             PortalDataStore.getInstance().intersectsTrackedPortal(dimensionId, pos))
         {
-            this.enqueueChunk(new ChunkPos(pos));
+            this.enqueueChunk(new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4));
         }
     }
 
@@ -81,14 +81,14 @@ public class PortalScanner
         {
             long packed = this.queue.dequeueLong();
             this.queuedChunks.remove(packed);
-            ChunkPos chunkPos = new ChunkPos(packed);
+            ChunkPos chunkPos = ChunkPos.unpack(packed);
             this.scanChunk(mc.level, chunkPos);
         }
     }
 
     private void enqueueChunk(ChunkPos chunkPos)
     {
-        long packed = chunkPos.toLong();
+        long packed = chunkPos.pack();
 
         if (this.queuedChunks.add(packed))
         {
