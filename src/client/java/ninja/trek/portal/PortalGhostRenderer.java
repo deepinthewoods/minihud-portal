@@ -22,9 +22,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
     private static final float FRAME_ALPHA = 0.4f;
 
     private final LayerRange layerRange = new LayerRange(this);
-    private final PortalRenderObjectVbo frameQuads = new PortalRenderObjectVbo(
-            () -> "minihud-portal:portal_preview/frame",
-            MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL);
+    @Nullable private PortalRenderObjectVbo frameQuads;
     private LongOpenHashSet frameBlocks = new LongOpenHashSet();
     @Nullable private PortalBounds lastPortalBounds;
     private boolean dirty = true;
@@ -67,7 +65,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
         PortalBounds bounds = preview.portalBounds();
 
         if (this.lastPortalBounds != null && this.lastPortalBounds.equals(bounds) &&
-            this.dirty == false && this.frameQuads.isUploadedPublic())
+            this.dirty == false && this.frameQuads != null && this.frameQuads.isUploadedPublic())
         {
             return;
         }
@@ -89,7 +87,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
     @Override
     public void draw(Vec3d cameraPos)
     {
-        if (this.hasData == false)
+        if (this.hasData == false || this.frameQuads == null)
         {
             return;
         }
@@ -100,13 +98,20 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
     @Override
     public boolean hasData()
     {
-        return this.hasData && this.frameQuads.isUploadedPublic();
+        return this.hasData && this.frameQuads != null && this.frameQuads.isUploadedPublic();
     }
 
     @Override
     public void reset()
     {
         super.reset();
+
+        if (this.frameQuads != null)
+        {
+            this.frameQuads.closePublic();
+            this.frameQuads = null;
+        }
+
         this.clearFrame();
     }
 
@@ -151,6 +156,15 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
             return;
         }
 
+        if (this.frameQuads == null)
+        {
+            // MaLiLib's render pipelines are populated after Fabric entrypoints run.
+            // Allocate the VBO on first use instead of during static initialization.
+            this.frameQuads = new PortalRenderObjectVbo(
+                    () -> "minihud-portal:portal_preview/frame",
+                    MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL);
+        }
+
         BufferBuilder builder = this.frameQuads.start(
                 () -> "minihud-portal:portal_preview/frame",
                 MaLiLibPipelines.POSITION_COLOR_MASA_NO_DEPTH_NO_CULL,
@@ -163,7 +177,7 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
 
         if (meshData != null)
         {
-            this.frameQuads.upload(meshData, false);
+            this.frameQuads.uploadAtOrigin(meshData, false, cameraPos);
             meshData.close();
             this.hasData = true;
             this.dirty = false;
@@ -177,16 +191,11 @@ public class PortalGhostRenderer extends OverlayRendererBase implements IRangeCh
 
     private void drawRenderObject(PortalRenderObjectVbo obj, Vec3d cameraPos)
     {
-        if (obj == null || obj.isStartedPublic() == false || obj.isUploadedPublic() == false)
+        if (obj == null)
         {
             return;
         }
 
-        if (this.shouldResort && obj.shouldResortPublic())
-        {
-            obj.resortTranslucentPublic(obj.createVertexSorterPublic(cameraPos.toVanilla()));
-        }
-
-        obj.drawPostPublic(false);
+        obj.drawAtBuildOrigin(this.getUpdatePosition(), cameraPos, this.shouldResort);
     }
 }

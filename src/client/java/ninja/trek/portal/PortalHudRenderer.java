@@ -31,6 +31,7 @@ public class PortalHudRenderer implements IRenderer
         Minecraft mc = Minecraft.getInstance();
 
         if (Configs.Generic.MAIN_RENDERING_TOGGLE.getBooleanValue() == false ||
+            PortalDataStore.getInstance().getZoneSettings().shouldShowPortalHud() == false ||
             DebugDataManager.getInstance().shouldShowDebugHudFix() ||
             mc.player == null || mc.gui.hud.isHidden())
         {

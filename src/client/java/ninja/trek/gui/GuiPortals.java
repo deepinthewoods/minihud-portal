@@ -130,6 +130,10 @@ public class GuiPortals extends GuiListBase<Object, WidgetListEntryBase<Object>,
                 "minihud-portal.gui.button.portal_zone_letters", settings.shouldRenderLetters());
         layout = this.placeTopRowButton(layout, renderLettersButton);
 
+        ButtonOnOff portalHudButton = new ButtonOnOff(0, 0, -1, false,
+                "minihud-portal.gui.button.portal_destination_hud", settings.shouldShowPortalHud());
+        layout = this.placeTopRowButton(layout, portalHudButton);
+
         ButtonOnOff simpleModeButton = new ButtonOnOff(0, 0, -1, false,
                 "minihud-portal.gui.button.portal_simple_mode", settings.isSimpleMode());
         layout = this.placeTopRowButton(layout, simpleModeButton);
@@ -171,6 +175,13 @@ public class GuiPortals extends GuiListBase<Object, WidgetListEntryBase<Object>,
             PortalDataStore.getInstance().markDirty();
             PortalZoneRenderer.INSTANCE.onSettingsChanged();
             LOGGER.warn("Portal zone letters toggled via GUI: renderLetters={}", settings.shouldRenderLetters());
+        });
+
+        this.addButton(portalHudButton, (btn, mouseBtn) -> {
+            settings.toggleShowPortalHud();
+            portalHudButton.updateDisplayString(settings.shouldShowPortalHud());
+            PortalDataStore.getInstance().markDirty();
+            LOGGER.warn("Portal destination HUD toggled via GUI: showPortalHud={}", settings.shouldShowPortalHud());
         });
 
         this.addButton(simpleModeButton, (btn, mouseBtn) -> {

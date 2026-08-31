@@ -822,11 +822,11 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
             if (meshData != null)
             {
-                cache.quads.upload(meshData, this.shouldResort);
+                cache.quads.uploadAtOrigin(meshData, this.shouldResort, cameraPos);
 
                 if (this.shouldResort)
                 {
-                    cache.quads.startResorting(meshData, cache.quads.createVertexSorterPublic(cameraPos.toVanilla()));
+                    cache.quads.startResorting(meshData, cache.quads.createVertexSorterForCamera(cameraPos));
                 }
 
                 meshData.close();
@@ -867,7 +867,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
             if (meshData != null)
             {
-                cache.outlines.upload(meshData, false);
+                cache.outlines.uploadAtOrigin(meshData, false, cameraPos);
                 meshData.close();
             }
         }
@@ -938,7 +938,7 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
             if (meshData != null)
             {
-                letters.upload(meshData, false);
+                letters.uploadAtOrigin(meshData, false, cameraPos);
                 meshData.close();
                 LOGGER.info("Uploaded letter mesh for portal {}", cacheKey);
             }
@@ -1314,22 +1314,12 @@ public class PortalZoneRenderer extends OverlayRendererBase implements IRangeCha
 
     private void drawRenderObject(PortalRenderObjectVbo obj, Vec3d cameraPos)
     {
-        this.drawRenderObject(obj, cameraPos, this.glLineWidth);
-    }
-
-    private void drawRenderObject(PortalRenderObjectVbo obj, Vec3d cameraPos, float lineWidth)
-    {
-        if (obj == null || obj.isStartedPublic() == false || obj.isUploadedPublic() == false)
+        if (obj == null)
         {
             return;
         }
 
-        if (this.shouldResort && obj.shouldResortPublic())
-        {
-            obj.resortTranslucentPublic(obj.createVertexSorterPublic(cameraPos.toVanilla()));
-        }
-
-        obj.drawPostPublic(false);
+        obj.drawAtBuildOrigin(this.getUpdatePosition(), cameraPos, this.shouldResort);
     }
 
     private boolean hasVisibleDirtyPortals(Vec3d cameraPos, Minecraft mc)

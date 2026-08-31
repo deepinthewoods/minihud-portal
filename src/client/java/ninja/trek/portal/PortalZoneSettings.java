@@ -9,6 +9,7 @@ public class PortalZoneSettings
     private boolean renderLines;
     private boolean renderThrough;
     private boolean renderLetters;
+    private boolean showPortalHud = true;
     private boolean simpleMode;
     private boolean disablePortalScanning;
 
@@ -30,6 +31,11 @@ public class PortalZoneSettings
     public boolean shouldRenderLetters()
     {
         return this.renderLetters;
+    }
+
+    public boolean shouldShowPortalHud()
+    {
+        return this.showPortalHud;
     }
 
     public boolean isSimpleMode()
@@ -62,6 +68,11 @@ public class PortalZoneSettings
         this.renderLetters = renderLetters;
     }
 
+    public void setShowPortalHud(boolean showPortalHud)
+    {
+        this.showPortalHud = showPortalHud;
+    }
+
     public void setSimpleMode(boolean simpleMode)
     {
         this.simpleMode = simpleMode;
@@ -92,6 +103,11 @@ public class PortalZoneSettings
         this.renderLetters = !this.renderLetters;
     }
 
+    public void toggleShowPortalHud()
+    {
+        this.showPortalHud = !this.showPortalHud;
+    }
+
     public void toggleSimpleMode()
     {
         this.simpleMode = !this.simpleMode;
@@ -108,6 +124,7 @@ public class PortalZoneSettings
         this.renderLines = false;
         this.renderThrough = false;
         this.renderLetters = false;
+        this.showPortalHud = true;
         this.simpleMode = false;
         this.disablePortalScanning = false;
     }
@@ -119,6 +136,7 @@ public class PortalZoneSettings
         obj.addProperty("render_lines", this.renderLines);
         obj.addProperty("render_through", this.renderThrough);
         obj.addProperty("render_letters", this.renderLetters);
+        obj.addProperty("show_portal_hud", this.showPortalHud);
         obj.addProperty("simple_mode", this.simpleMode);
         obj.addProperty("disable_portal_scanning", this.disablePortalScanning);
         return obj;
@@ -135,6 +153,7 @@ public class PortalZoneSettings
         this.renderLines = JsonUtils.getBooleanOrDefault(obj, "render_lines", this.renderLines);
         this.renderThrough = JsonUtils.getBooleanOrDefault(obj, "render_through", this.renderThrough);
         this.renderLetters = JsonUtils.getBooleanOrDefault(obj, "render_letters", this.renderLetters);
+        this.showPortalHud = JsonUtils.getBooleanOrDefault(obj, "show_portal_hud", this.showPortalHud);
         this.simpleMode = JsonUtils.getBooleanOrDefault(obj, "simple_mode", this.simpleMode);
         this.disablePortalScanning = JsonUtils.getBooleanOrDefault(obj, "disable_portal_scanning", this.disablePortalScanning);
     }
